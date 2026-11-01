@@ -2,7 +2,7 @@
   "tool_version": "0.3.0",
   "spec_version": 4,
   "agent": "claude",
-  "updated_at": "2026-11-01T14:35:00.009Z",
+  "updated_at": "2026-11-01T15:09:56.087Z",
   "score": {
     "before": 23,
     "after": 92
@@ -20,10 +20,10 @@
     "fast": {
       "command": "make check-fast",
       "ok": true,
-      "at": "2026-11-01T14:35:00.009Z",
-      "commit": "83097896",
+      "at": "2026-11-01T15:09:56.150Z",
+      "commit": "8157861c",
       "tests": {
-        "ran": 238,
+        "ran": 239,
         "skipped": 0,
         "failed": 0
       },
@@ -32,10 +32,10 @@
     "full": {
       "command": "make check",
       "ok": true,
-      "at": "2026-11-01T14:35:00.009Z",
-      "commit": "83097896",
+      "at": "2026-11-01T15:09:56.150Z",
+      "commit": "8157861c",
       "tests": {
-        "ran": 1751,
+        "ran": 1752,
         "skipped": 0,
         "failed": 0
       },
@@ -141,7 +141,73 @@
     "tests": null,
     "note": "ran no test (exit 127)"
   },
-  "proofs": [],
+  "proofs": [
+    {
+      "at": "2026-11-01T15:09:56.087Z",
+      "agent": "claude",
+      "task": {
+        "title": "Fix missing imports in taiga/projects/userstories/filters.py (latent NameError)",
+        "description": "UserStoryStatusesFilter.filter_queryset uses `logger` and `exc`, but neither is imported, so a non-integer `project` parameter raises NameError instead of BadRequest. The bug is latent on GET /api/v1/userstories, because CanViewUsFilterBackend runs first and already returns 400, but the filter is broken whenever it runs on its own.",
+        "acceptance": [
+          "taiga/projects/userstories/filters.py imports `exc` from taiga.base and defines a module `logger`, like taiga/base/filters.py does",
+          "A new test in tests/unit calls UserStoryStatusesFilter().filter_queryset with QUERY_PARAMS {'project': 'abc'} and expects taiga.base.exceptions.BadRequest",
+          "`.venv/bin/flake8 --select=F821 taiga/projects/userstories/filters.py` reports nothing",
+          "`make check-fast` passes"
+        ]
+      },
+      "branch": "uw-harness/prove-20261101-1551",
+      "status": "done",
+      "acceptance": [
+        {
+          "criterion": "filters.py imports `exc` from taiga.base and defines a module `logger`, like taiga/base/filters.py",
+          "met": true,
+          "evidence": "Added `import logging`, `from taiga.base import exceptions as exc`, `logger = logging.getLogger(__name__)`, which is the same pattern as taiga/base/filters.py lines 8, 17 and 21."
+        },
+        {
+          "criterion": "New test in tests/unit calls UserStoryStatusesFilter().filter_queryset with QUERY_PARAMS {'project': 'abc'} and expects BadRequest",
+          "met": true,
+          "evidence": "tests/unit/test_userstories_filters.py::test_userstory_statuses_filter_with_non_integer_project_raises_bad_request. It failed with `NameError: name 'logger' is not defined` before the fix and passes after it."
+        },
+        {
+          "criterion": "`.venv/bin/flake8 --select=F821 taiga/projects/userstories/filters.py` reports nothing",
+          "met": true,
+          "evidence": "No output, exit 0."
+        },
+        {
+          "criterion": "`make check-fast` passes",
+          "met": true,
+          "evidence": "`rtk proxy make check-fast` exit=0, '239 passed, 187 warnings in 25.09s'."
+        }
+      ],
+      "fix_rounds": 0,
+      "before": {
+        "ran": 1751,
+        "skipped": 0,
+        "failed": 0
+      },
+      "after": {
+        "ran": 1752,
+        "skipped": 0,
+        "failed": 0
+      },
+      "gates_ok": true,
+      "human_needed": [],
+      "harness_gaps": [
+        {
+          "file": "AGENTS.md",
+          "problem": "AGENTS.md does not warn that the local rtk output filter truncates `make check-fast` output: I saw only warnings and '248 lines truncated', with no pass/fail summary. The workaround (`rtk proxy make check-fast`) is only written in docs/harness/log.md. It should be in AGENTS.md next to the gate command, or the gate should print a short last line with the result."
+        },
+        {
+          "file": ".agents/skills/implement-change/SKILL.md",
+          "problem": "The skill gives only integration-test examples (`tests/integration/test_userstories.py`). It does not say that small units such as filter backends can be tested in tests/unit with a mocked request (`mock.Mock(QUERY_PARAMS=...)`) and no database. I found this pattern myself."
+        }
+      ],
+      "skipped_test_files": [],
+      "failed_before": [],
+      "relaxed_checks": [],
+      "duration_s": 2061
+    }
+  ],
   "last_run": {
     "skipped_test_files": [],
     "relaxed_checks": [],

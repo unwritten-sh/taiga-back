@@ -15,6 +15,12 @@ One entry per significant change: date, what changed, what was learned, what is 
 - **Dev dependency added.** `flake8` in `requirements-devel.in`; `requirements-devel.txt` regenerated with `pip-compile` without `--upgrade` (only additions: flake8, mccabe, pycodestyle, pyflakes).
 - **Secret in tracked code, not changed.** `settings/common.py:249` holds a hard-coded `SECRET_KEY`. See the TODO in `AGENTS.md` and the `blocked` list of the harness build.
 
+## 2026-11-01: missing imports in userstories filters fixed
+
+- **What changed.** `taiga/projects/userstories/filters.py` now imports `exceptions as exc` from `taiga.base` and defines a module `logger`, like `taiga/base/filters.py`. `UserStoryStatusesFilter` now raises `BadRequest` instead of `NameError` for a non-integer `project` parameter. New unit test `tests/unit/test_userstories_filters.py` (it failed with `NameError` before the fix). `flake8 --select=F821` on the file is clean. `make check-fast`: 239 passed.
+- **What we learned.** Filter backends can be tested in `tests/unit` with a `mock.Mock(QUERY_PARAMS=...)` request, without the database.
+- **What is left.** The other F821 items from the harness build notes (`taiga/base/fields.py:111-133`, `taiga/projects/attachments/services.py:95`) are still open.
+
 ## 2026-11-01: fast gate output shows the test run
 
 - **What changed.** `make test-unit` (used by `make check-fast`) ran `pytest tests/unit --reuse-db -q`. The `-q` flag hides the pytest header ("test session starts", "collected N items") and the file names, so the harness verifier reported that the fast gate ran no tests, although 238 tests passed. The target now runs `pytest tests/unit --reuse-db -rA --tb=short`: the output shows the header, one line per test file, one `PASSED <test id>` line per test and the final summary (`238 passed`). No test or check was removed.
@@ -110,3 +116,15 @@ Risks seen before the harness:
 - Is Sentry (or another error tracker) configured for production outside this repository, for example in a private settings file? Where do the team see errors? (in `docs/observability.md`)
 - Which dashboards and metrics does the team use for production (request rate, latency, queue length, worker health)? (in `docs/observability.md`)
 - What is the signal that production is broken (health check URL, key metric, alert rule) and which channel receives alerts? (in `docs/observability.md`)
+
+## 2026-11-01: pilot task done with the harness by claude
+
+**Task:** Fix missing imports in taiga/projects/userstories/filters.py (latent NameError). UserStoryStatusesFilter.filter_queryset uses `logger` and `exc`, but neither is imported, so a non-integer `project` parameter raises NameError instead of BadRequest. The bug is latent on GET /api/v1/userstories, because CanViewUsFilterBackend runs first and already returns 400, but the filter is broken whenever it runs on its own.
+
+UserStoryStatusesFilter used `logger` and `exc` without importing them, so a non-integer `project` parameter raised NameError instead of BadRequest. I added `import logging`, `from taiga.base import exceptions as exc` and `logger = logging.getLogger(__name__)` to taiga/projects/userstories/filters.py, the same way taiga/base/filters.py does it. A new unit test calls the filter with QUERY_PARAMS {'project': 'abc'}. Before the fix it failed with NameError, and after the fix it passes with BadRequest. flake8 F821 on the file is clean, `make check-fast` exits 0 (239 passed), and I added an entry to docs/harness/log.md.
+
+- Status reported by the agent: done. Acceptance criteria met: 4 of 4.
+- Gates after the task: pass. Tests before: 1751 tests. After: 1752 tests.
+- Fix rounds after a gate failed: 0. Questions for a human: 0. Unattended: yes.
+- Harness gap: `AGENTS.md`: AGENTS.md does not warn that the local rtk output filter truncates `make check-fast` output: I saw only warnings and '248 lines truncated', with no pass/fail summary. The workaround (`rtk proxy make check-fast`) is only written in docs/harness/log.md. It should be in AGENTS.md next to the gate command, or the gate should print a short last line with the result.
+- Harness gap: `.agents/skills/implement-change/SKILL.md`: The skill gives only integration-test examples (`tests/integration/test_userstories.py`). It does not say that small units such as filter backends can be tested in tests/unit with a mocked request (`mock.Mock(QUERY_PARAMS=...)`) and no database. I found this pattern myself.

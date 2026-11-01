@@ -10,8 +10,8 @@ Harness coverage went from 23 to 92 out of 100, level 0 to 2 (self-checking). Th
 
 | Gate | Command | Result | Tests |
 | --- | --- | --- | --- |
-| fast | `make check-fast` | pass | 238 tests |
-| full | `make check` | pass | 1751 tests |
+| fast | `make check-fast` | pass | 239 tests |
+| full | `make check` | pass | 1752 tests |
 
 Before the harness, the project's tests could not be measured: `pytest` ran no test (exit 127). This says nothing about whether the tests pass, and the gates could not be compared with a starting point.
 1 test files only compare literals (for example `assert True`) and protect nothing: `tests/integration/test_webhook_serializers.py`.
@@ -55,6 +55,24 @@ UserStoryStatusesFilter.filter_queryset uses `logger` and `exc`, but neither is 
 
 Run it with `npx uw-harness prove`: an agent does the task with the harness, on its own branch, and the result is added to this page.
 
+## Pilot result: Fix missing imports in taiga/projects/userstories/filters.py (latent NameError)
+
+Run by claude on 2026-11-01, on branch `uw-harness/prove-20261101-1551`, in 34 minutes.
+
+- Agent status: **done**. Acceptance criteria met, as reported by the agent: 4 of 4.
+- Gates after the task: pass. Tests before: 1751 tests. After: 1752 tests.
+- Fix rounds after a gate failed: 0. Questions only a human could answer: 0.
+- Unattended (done, gates pass, every requested criterion met, no question for a human): **yes**.
+  - met: filters.py imports `exc` from taiga.base and defines a module `logger`, like taiga/base/filters.py. Added `import logging`, `from taiga.base import exceptions as exc`, `logger = logging.getLogger(__name__)`, which is the same pattern as taiga/base/filters.py lines 8, 17 and 21.
+  - met: New test in tests/unit calls UserStoryStatusesFilter().filter_queryset with QUERY_PARAMS {'project': 'abc'} and expects BadRequest. tests/unit/test_userstories_filters.py::test_userstory_statuses_filter_with_non_integer_project_raises_bad_request. It failed with `NameError: name 'logger' is not defined` before the fix and passes after it.
+  - met: `.venv/bin/flake8 --select=F821 taiga/projects/userstories/filters.py` reports nothing. No output, exit 0.
+  - met: `make check-fast` passes. `rtk proxy make check-fast` exit=0, '239 passed, 187 warnings in 25.09s'.
+
+Gaps in the harness that the agent reported:
+
+- `AGENTS.md`: AGENTS.md does not warn that the local rtk output filter truncates `make check-fast` output: I saw only warnings and '248 lines truncated', with no pass/fail summary. The workaround (`rtk proxy make check-fast`) is only written in docs/harness/log.md. It should be in AGENTS.md next to the gate command, or the gate should print a short last line with the result.
+- `.agents/skills/implement-change/SKILL.md`: The skill gives only integration-test examples (`tests/integration/test_userstories.py`). It does not say that small units such as filter backends can be tested in tests/unit with a mocked request (`mock.Mock(QUERY_PARAMS=...)`) and no database. I found this pattern myself.
+
 ## What this does not prove
 
-It does not prove that agents can work on this repository without supervision. It proves that the knowledge is written down and that the gates run and run tests. No pilot task has been run yet. One task is one data point. Review the branch, answer the open questions, and judge the result yourself.
+It does not prove that agents can work on this repository without supervision. It proves that the knowledge is written down and that the gates run and run tests. One real task went through without help from a human, as reported above. One task is one data point. Review the branch, answer the open questions, and judge the result yourself.

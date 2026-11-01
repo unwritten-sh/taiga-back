@@ -5,12 +5,17 @@
 #
 # Copyright (c) 2021-present Kaleidos INC
 
+import logging
+
 from django.apps import apps
 from django.contrib.auth.models import AnonymousUser
 from django.db.models import Q, OuterRef, Subquery
 from django.utils.translation import gettext as _
 
+from taiga.base import exceptions as exc
 from taiga.base import filters
+
+logger = logging.getLogger(__name__)
 
 
 def get_assigned_users_filter(model, value):
