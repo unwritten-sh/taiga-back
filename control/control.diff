@@ -1,0 +1,52 @@
+diff --git a/taiga/projects/userstories/filters.py b/taiga/projects/userstories/filters.py
+index 97ddb9d3..f5f67a48 100644
+--- a/taiga/projects/userstories/filters.py
++++ b/taiga/projects/userstories/filters.py
+@@ -5,13 +5,18 @@
+ #
+ # Copyright (c) 2021-present Kaleidos INC
+ 
++import logging
++
+ from django.apps import apps
+ from django.contrib.auth.models import AnonymousUser
+ from django.db.models import Q, OuterRef, Subquery
+ from django.utils.translation import gettext as _
+ 
++from taiga.base import exceptions as exc
+ from taiga.base import filters
+ 
++logger = logging.getLogger(__name__)
++
+ 
+ def get_assigned_users_filter(model, value):
+     assigned_users_ids = model.objects.order_by().filter(
+diff --git a/tests/unit/test_userstories_filters.py b/tests/unit/test_userstories_filters.py
+new file mode 100644
+index 00000000..8621aec9
+--- /dev/null
++++ b/tests/unit/test_userstories_filters.py
+@@ -0,0 +1,23 @@
++# -*- coding: utf-8 -*-
++# This Source Code Form is subject to the terms of the Mozilla Public
++# License, v. 2.0. If a copy of the MPL was not distributed with this
++# file, You can obtain one at http://mozilla.org/MPL/2.0/.
++#
++# Copyright (c) 2021-present Kaleidos INC
++
++from unittest import mock
++
++import pytest
++
++from taiga.base.exceptions import BadRequest
++from taiga.projects.userstories.filters import UserStoryStatusesFilter
++
++
++def test_userstory_statuses_filter_rejects_non_integer_project():
++    request = mock.Mock(QUERY_PARAMS={"project": "abc"})
++    queryset = mock.Mock()
++
++    with pytest.raises(BadRequest):
++        UserStoryStatusesFilter().filter_queryset(request, queryset, view=None)
++
++    queryset.filter.assert_not_called()

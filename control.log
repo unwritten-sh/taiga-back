@@ -1,0 +1,12 @@
+  $ pytest
+  ! before the harness: the test command did not run tests (exit 127, 0s)
+fatal: '/Users/victor/Repos/unwritten/uw-harness-cases/taiga/control/eval-tree' is not a working tree
+Preparing worktree (detached HEAD 8157861c)
+  $ make setup
+  ✓ setup gate passed in 1s
+  $ make check-fast
+  ✓ fast gate passed in 35s: 239 tests
+  $ make check
+  ✓ full gate passed in 991s: 1752 tests
+control: partial, 3/4 criteria, 1 questions, 73s, own tests: ran no test (exit 127), harness gates: pass
+control exit 0

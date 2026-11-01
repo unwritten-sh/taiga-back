@@ -1,0 +1,11 @@
+{
+  "slug": "taiga",
+  "upstream": "https://github.com/taigaio/taiga-back",
+  "base_sha": "830978962987b0de8856f5bb6344ba06399dc1aa",
+  "base_branch": "main",
+  "started_at": "2026-11-01T13:06:00Z",
+  "uw_harness_sha": "95c8983cc832acd687c030f46a6d67ff4e9f15d5",
+  "uw_harness_version": "0.3.0",
+  "agent": "claude",
+  "agent_version": "2.1.316 (Claude Code)"
+}

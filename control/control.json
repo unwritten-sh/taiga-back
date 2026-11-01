@@ -1,0 +1,115 @@
+{
+  "at": "2026-11-01T16:45:52.890Z",
+  "agent": "claude",
+  "base": "830978962987b0de8856f5bb6344ba06399dc1aa",
+  "harness_branch": "uw-harness/20261101-1408",
+  "task": {
+    "title": "Fix missing imports in taiga/projects/userstories/filters.py (latent NameError)",
+    "description": "UserStoryStatusesFilter.filter_queryset uses `logger` and `exc`, but neither is imported, so a non-integer `project` parameter raises NameError instead of BadRequest. The bug is latent on GET /api/v1/userstories, because CanViewUsFilterBackend runs first and already returns 400, but the filter is broken whenever it runs on its own.",
+    "acceptance": [
+      "taiga/projects/userstories/filters.py imports `exc` from taiga.base and defines a module `logger`, like taiga/base/filters.py does",
+      "A new test in tests/unit calls UserStoryStatusesFilter().filter_queryset with QUERY_PARAMS {'project': 'abc'} and expects taiga.base.exceptions.BadRequest",
+      "`.venv/bin/flake8 --select=F821 taiga/projects/userstories/filters.py` reports nothing",
+      "`make check-fast` passes"
+    ]
+  },
+  "duration_s": 79,
+  "status": "partial",
+  "acceptance": [
+    {
+      "criterion": "taiga/projects/userstories/filters.py imports `exc` from taiga.base and defines a module `logger`, like taiga/base/filters.py does",
+      "met": true,
+      "evidence": "Added `import logging`, `from taiga.base import exceptions as exc` and `logger = logging.getLogger(__name__)`, the same pattern as taiga/base/filters.py lines 8, 16 and 21."
+    },
+    {
+      "criterion": "A new test in tests/unit calls UserStoryStatusesFilter().filter_queryset with QUERY_PARAMS {'project': 'abc'} and expects taiga.base.exceptions.BadRequest",
+      "met": true,
+      "evidence": "tests/unit/test_userstories_filters.py::test_userstory_statuses_filter_rejects_non_integer_project passes (`.venv/bin/python -m pytest tests/unit/test_userstories_filters.py`: 1 passed). With the original filters.py it fails with NameError: name 'logger' is not defined."
+    },
+    {
+      "criterion": "`.venv/bin/flake8 --select=F821 taiga/projects/userstories/filters.py` reports nothing",
+      "met": true,
+      "evidence": "The command gives no output and exits with 0. Before the fix it reported F821 for 'logger' (line 45) and 'exc' (line 47). The full flake8 run on the file still reports E126 and W503, but those errors already existed before the change and are out of scope."
+    },
+    {
+      "criterion": "`make check-fast` passes",
+      "met": false,
+      "evidence": "This cannot be run: the repository has no Makefile and no file contains 'check-fast'. As the closest checks the repository defines (tox.ini runs pytest, CI runs pytest), I ran `.venv/bin/python -m pytest tests/unit -q`: 239 passed. I did not run the full suite, because the integration tests need Postgres and RabbitMQ according to .github/workflows/tests-and-coverall.yml."
+    }
+  ],
+  "criteria_requested": 4,
+  "criteria_met": 3,
+  "human_needed": [
+    {
+      "question": "What should `make check-fast` run? Is the Makefile missing from this branch, or does the team mean another command (for example pytest tests/unit plus flake8)?",
+      "why": "The acceptance criterion names a target that does not exist in the repository. I should not invent its content or add a Makefile that the task does not ask for."
+    }
+  ],
+  "gaps": [
+    {
+      "file": null,
+      "problem": "The task names `make check-fast`, but the repository has no Makefile and no definition of check-fast. No document explains the fast local check."
+    },
+    {
+      "file": "README.md",
+      "problem": "No document explains how to run the tests locally or which tests need Postgres and RabbitMQ. I had to read tox.ini, pytest.ini and the CI workflow to learn this."
+    },
+    {
+      "file": "setup.cfg",
+      "problem": "flake8 already reports E126 and W503 on taiga/projects/userstories/filters.py, so a full flake8 run on the file cannot be clean. No document says whether these errors are accepted."
+    }
+  ],
+  "summary": "I added `import logging`, `from taiga.base import exceptions as exc` and a module-level `logger = logging.getLogger(__name__)` to taiga/projects/userstories/filters.py, following taiga/base/filters.py. Without these, a non-integer `project` parameter raised NameError instead of BadRequest. I added the unit test tests/unit/test_userstories_filters.py: it fails with `NameError: name 'logger' is not defined` on the original file and passes with the fix. The whole tests/unit suite passes (239 passed). The status is partial for one reason only: the criterion `make check-fast` cannot be met as written, because this repository has no Makefile and no `check-fast` target anywhere.",
+  "files_changed": [
+    "taiga/projects/userstories/filters.py",
+    "tests/unit/test_userstories_filters.py"
+  ],
+  "skipped_test_files": [],
+  "relaxed_checks": [],
+  "own_tests": {
+    "command": "pytest",
+    "ok": true,
+    "tests": {
+      "ran": 1752,
+      "skipped": 0,
+      "failed": 0
+    },
+    "note": null
+  },
+  "harness_gates": {
+    "ok": true,
+    "tests": {
+      "ran": 1752,
+      "skipped": 0,
+      "failed": 0
+    },
+    "runs": [
+      {
+        "name": "setup",
+        "ok": true,
+        "tests": null,
+        "tail": ""
+      },
+      {
+        "name": "fast",
+        "ok": true,
+        "tests": {
+          "ran": 239,
+          "skipped": 0,
+          "failed": 0
+        },
+        "tail": ""
+      },
+      {
+        "name": "full",
+        "ok": true,
+        "tests": {
+          "ran": 1752,
+          "skipped": 0,
+          "failed": 0
+        },
+        "tail": ""
+      }
+    ]
+  }
+}

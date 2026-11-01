@@ -1,0 +1,301 @@
+uw-harness 0.3.0  /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo
+
+▸ Detect
+
+  Knowledge
+  ✗ L1 An AGENTS.md at the root  no AGENTS.md
+  ✗ L1 AGENTS.md matches the repository  no AGENTS.md to check
+  ✗ L1 An architecture overview with a diagram  no docs/architecture.md
+  ◐ L1 What the product does and for whom  only README.md (47 lines), no docs/product.md
+  ✗ L2 Architecture decision records  no docs/decisions/
+  ◐ L2 An implementation log  only CHANGELOG.md
+  ✓ L1 Team agreements  CONTRIBUTING.md exists
+
+  Verification loops
+  ✗ L1 One entry point for tasks  no Makefile, justfile, Taskfile or package.json scripts
+  ✗ L2 A fast gate  no fast gate target (for example check-fast)
+  ✗ L2 A full gate  no full gate target (for example check)
+  ✓ L1 Automated tests  120 test files (ignored: 11 without any test, 1 with only trivial assertions)
+  ◐ L2 CI runs the gate on every change  .github/workflows/tests-and-coverall.yml exist but do not call the task runner
+  ✗ L3 Git hooks run the fast gate  no git hooks configuration
+
+  Local environment
+  ✗ L1 The app runs locally with one command  no compose file, devcontainer or dev target
+  ✗ L1 Configuration is documented, no secret in git  no .env.example
+  ✓ L1 Toolchain versions are pinned  .python-version exists
+
+  Delivery and operations
+  ◐ L3 Deployment is explicit in the repository  deployment artifacts (docker/Dockerfile) but no docs/deploy.md
+  ✗ L3 Production can be observed  no docs/observability.md
+
+  Capabilities
+  ✗ L2 Skills for repeated tasks  no skills in .agents/skills/ or .claude/skills/
+
+  harness coverage 23/100  level 0 (not yet oriented)  3 pass, 4 partial, 12 missing
+
+▸ Analyze
+  Agent: claude (your installed CLI, with your login and default model)
+  A full run uses your agent for 10 to 30 minutes, inside your normal plan or usage.
+  claude reads the repository in read-only mode. This takes a few minutes.
+  · $ cd /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo; ls -a; cat README.md; cat .…
+  · $ cd /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo; git shortlog -sn | head; ca…
+  · $ cd /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo; git shortlog -sn HEAD | hea…
+  · $ cd /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo; sed -n 20,46p settings/comm…
+  · $ cd /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo; sed -n 78,200p docker/confi…
+  · $ cd /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo; grep -in "^django==\|^sentr…
+  · StructuredOutput
+  ✓ Taiga Backend (taiga-back): 10 components, 10 use cases, 7 questions (2m 10s)
+  Assessment: /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/.git/uw-harness/assessment.md
+
+▸ Questions
+  7 questions need a human. They become TODO blocks in the docs.
+
+▸ Baseline
+  The project's own test command, before any change, to compare with the gates later.
+  $ pytest
+  ! before the harness: the test command did not run tests (exit 127, 0s)
+
+▸ Apply
+  Created branch uw-harness/20261101-1408 from main
+  claude writes the harness on this branch. This usually takes 10 to 30 minutes.
+  · $ ls -la && cat .gitignore && cat .python-version && cat scripts/install && cat tox.ini set…
+  · $ cat CONTRIBUTING.md docs/update-dependencies.md regenerate.sh README.md docker/config.py …
+  · $ pyenv versions; which uv python3.11 python3.12; uv python list 2>/dev/null | head; lsof -…
+  · $ cat requirements.in scripts/upgrade; grep -nE 'psycopg|magic|cairo|sentry|rudder' require…
+  · $ uv venv --seed --python 3.10 .venv 2>&1 | tail -3 && .venv/bin/python -m pip install -q -…
+  · write /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/compose.yaml
+  · $ docker compose up -d --wait postgres 2>&1 | tail -3; .venv/bin/pip install -q flake8 pip-…
+  · $ .venv/bin/flake8 --select=E9,F63,F7,F82 . ; echo "exit=$?"; .venv/bin/flake8 . | awk '{pr…
+  · $ sed -n 1,60p taiga/projects/userstories/filters.py; sed -n 85,100p taiga/projects/attachm…
+  · $ .venv/bin/flake8 --select=E9,F63,F7 . ; echo "exit=$?"; grep -rn "UserStoryStatusesFilter…
+  · $ time .venv/bin/pytest tests/unit -q -p no:cacheprovider 2>&1 | tail -15
+  · $ .venv/bin/pytest -q -p no:cacheprovider --reuse-db -x --tb=short -W ignore::DeprecationWa…
+  · $ cat manage.py; cat settings/__init__.py; grep -n "EVENTS_PUSH\|SECRET_KEY\|PASSWORD\|CELE…
+  · $ grep -rn "os.getenv\|os.environ" settings/common.py taiga | head; grep -on "os.getenv('[A…
+  · edit /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/compose.yaml
+  · $ printf 'flake8\npre-commit\n' >> requirements-devel.in && cat requirements-devel.in && .v…
+  · $ git diff requirements-devel.txt | grep '^[-+]' | grep -v '^[-+] *#' ; grep -c "^#" requir…
+  · $ rtk proxy git diff requirements-devel.txt | grep -E '^[-+][a-zA-Z]'
+  · $ tail -c 600 /tmp/taiga-full.log
+  · $ DJANGO_SETTINGS_MODULE=tests.config .venv/bin/python manage.py makemigrations --check --d…
+  · write /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/Makefile
+  · $ printf '.pytest_cache/\n.coverage.*\ncoverage.xml\nhtmlcov/\n' >> .gitignore && make help…
+  · TaskStop
+  · $ pkill -f "pytest -q -p no:cacheprovider" ; sleep 1; docker compose up -d --wait postgres …
+  · $ make check > /tmp/taiga-check.log 2>&1; echo "exit=$?" >> /tmp/taiga-check.log; tail -5 /…
+  · write /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/.pre-commit-config.yaml
+  · edit /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/.github/workflows/tests-and-coverall.yml
+  · write /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/.githooks/pre-push
+  · $ chmod +x .githooks/pre-push && sed -i '' '/^pre-commit$/d' requirements-devel.in && .venv…
+  · edit /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/Makefile
+  · write /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/.env.example
+  · $ cat taiga/urls.py | grep -v "^#" | head -60; grep -c "router.register" taiga/routers.py; …
+  · $ grep -n "LOGGING" -A45 settings/common.py | head -60; ls taiga taiga/events/backends; gre…
+  · $ sed -n 413,450p settings/common.py; rtk proxy grep -rn "sentry" taiga settings docker | h…
+  · write /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/docs/local-dev.md
+  · $ grep -n "EMAIL_BACKEND\|SEND_BULK_EMAILS_WITH_CELERY\|DJMAIL\|MEDIA_ROOT\|SESSION_ENGINE\…
+  · write /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/docs/architecture.md
+  · $ ls taiga/importers taiga/base | tr '\n' ' '; echo; rtk proxy grep -rn "redis" settings do…
+  · $ DJANGO_SETTINGS_MODULE=settings.common .venv/bin/python -c " import django;django.setup()…
+  · $ rtk proxy grep -rn "CELERY_ENABLED" taiga --include='*.py' | head; tail -c 300 /tmp/taiga…
+  · $ ps aux | grep -E "pytest|coverage" | grep -v grep | head -3
+  · $ cat /private/tmp/claude-501/-Users-victor-Repos-unwritten-uw-harness-cases-taiga-repo/f4c…
+  · $ ps aux | grep -E "make|rtk|manage.py|flake8" | grep -v grep | head
+  · $ PYTHONUNBUFFERED=1 rtk proxy make check > /tmp/taiga-check.log 2>&1; echo "exit=$?" >> /t…
+  · $ sleep 45; tail -c 400 /tmp/taiga-check.log; echo; wc -l /tmp/taiga-check.log
+  · write /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/docs/product.md
+  · $ rtk proxy grep -n '"swimlanes"\|"invitations"\|"memberships"\|project-templates\|web-noti…
+  · write /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/docs/decisions/0001-record-architecture-decisions.md
+  · write /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/docs/decisions/0002-celery-with-rabbitmq-and-pickle.md
+  · edit /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/CONTRIBUTING.md
+  · $ head -20 CHANGELOG.md; git log -3 --format='%ad %s' --date=short -- CHANGELOG.md; tail -c…
+  · edit /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/CONTRIBUTING.md
+  · $ grep -c PASSED /tmp/taiga-check.log; grep -cE "FAILED|ERROR" /tmp/taiga-check.log; head -…
+  · $ rtk proxy grep -n "pytestmark\|transaction\|def test_wiki_attachment_retrieve" tests/inte…
+  · $ rtk proxy .venv/bin/pytest --reuse-db -q -p no:cacheprovider "tests/integration/resources…
+  · $ rtk proxy .venv/bin/pytest --collect-only -q -p no:cacheprovider 2>/dev/null | tail -2; g…
+  · $ docker stats --no-stream --format '{{.Name}} {{.CPUPerc}} {{.MemUsage}}' | head -20; ps a…
+  · $ tail -5 /tmp/taiga-check.log | cut -c1-300; ps aux | grep -i python | grep -v grep | head…
+  · $ date; stat -f '%Sm %z' /tmp/taiga-check.log; pgrep -fl coverage | head -3; pgrep -fl make…
+  · $ kill 20062 20953; sleep 2; pgrep -fl "coverage run" ; echo done
+  · $ PYTHONUNBUFFERED=1 rtk proxy make check > /tmp/taiga-check.log 2>&1; echo "exit=$?" >> /t…
+  · write /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/docs/deploy.md
+  · write /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/docs/observability.md
+  · $ rtk proxy grep -n "class APIRoot\|def get_api_root_view\|permission_classes\|def get(self…
+  · read /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/taiga/base/routers.py
+  · edit /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/docs/observability.md
+  · $ sed -n 8,45p taiga/userstorage/api.py; cat taiga/userstorage/permissions.py | sed -n 8,30…
+  · $ sed -n 8,60p tests/integration/resources_permissions/test_storage_resources.py; grep -c P…
+  · $ sed -n 66,75p settings/common.py; rtk proxy grep -n "password" tests/factories.py | head …
+  · write /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/.agents/skills/implement-change/SKILL.md
+  · write /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/.agents/skills/debug-local/SKILL.md
+  · write /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/.agents/skills/add-api-endpoint/SKILL.md
+  · write /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/.agents/skills/deploy/SKILL.md
+  · $ rtk proxy grep -n "def list_route\|def detail_route" taiga/base/decorators.py; rtk proxy …
+  · $ rtk proxy grep -rn "auth_token" taiga/auth/*.py | head -3
+  · edit /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/.agents/skills/add-api-endpoint/SKILL.md
+  · $ ls -la .claude 2>&1 | head -3; mkdir -p .claude && ln -s ../.agents/skills .claude/skills…
+  · $ mkdir -p .claude && ln -s ../.agents/skills .claude/skills
+  · write /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/docs/harness/log.md
+  · $ grep -c PASSED /tmp/taiga-check.log; grep -E "FAILED|ERROR " /tmp/taiga-check.log | head
+  · $ pgrep -fl "pytest|coverage run" | cut -c1-150; tail -2 /tmp/taiga-check.log | cut -c1-200
+  · write /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/AGENTS.md
+  · $ ln -s AGENTS.md CLAUDE.md && ls -la CLAUDE.md; wc -l AGENTS.md
+  · $ rtk proxy npx -y uw-harness check 2>&1 | tail -40
+  · $ which uw-harness; ls ~/Repos/unwritten/ | head; ls ~/Repos/unwritten/uw-harness-cases | h…
+  · $ ls ~/Repos/unwritten/uw-harness; cat ~/Repos/unwritten/uw-harness/package.json 2>/dev/nul…
+  · $ node ~/Repos/unwritten/uw-harness/dist/cli.js check 2>&1 | tail -40
+  · $ node ~/Repos/unwritten/uw-harness/dist/cli.js check 2>&1 | head -40; node ~/Repos/unwritt…
+  · $ node ~/Repos/unwritten/uw-harness/dist/cli.js detect 2>&1 | tail -30; grep -c PASSED /tmp…
+  · $ ps -o pid,pcpu,etime,time -p 21955; docker stats --no-stream --format '{{.Name}} {{.CPUPe…
+  · ToolSearch
+  · Monitor
+  · $ until grep -q "^exit=" /tmp/taiga-check.log; do sleep 20; done; tail -5 /tmp/taiga-check.…
+  · $ rtk proxy grep -rn "must be an integer\|project=abc\|\"project\": \"a\|project=foo" tests…
+  · $ sed -n 50,75p taiga/projects/userstories/api.py; rtk proxy grep -n "QUERY_PARAMS\[\"proje…
+  · $ sed -n 135,155p taiga/base/filters.py; sed -n 262,280p taiga/base/filters.py; rtk proxy g…
+  · edit /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/docs/harness/log.md
+  · $ git status --short
+  · $ grep -c PASSED /tmp/taiga-check.log; grep -E "FAILED|ERROR " /tmp/taiga-check.log | head …
+  · $ until grep -q "^exit=" /tmp/taiga-check.log; do sleep 30; done; tail -4 /tmp/taiga-check.…
+  · $ grep -c PASSED /tmp/taiga-check.log; tail -1 /tmp/taiga-check.log | cut -c1-200; grep -cE…
+  · $ grep -E "FAILED|ERROR " /tmp/taiga-check.log | cut -c1-220 | head -60
+  · $ until grep -q "^exit=" /tmp/taiga-check.log; do sleep 30; done; tail -3 /tmp/taiga-check.…
+  · $ grep -n "test_push_event_epic_processing" /tmp/taiga-check.log | head -3; awk '/_+ test_p…
+  · $ rtk proxy grep -rln "transaction=True\|transactional_db" tests | head; docker compose exe…
+  · $ sed -i '' 's/-m pytest -v --tb=native --pythonwarnings=default --reuse-db/-m pytest -v --…
+  · read /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/Makefile
+  · edit /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/Makefile
+  · $ PYTHONUNBUFFERED=1 rtk proxy make check > /tmp/taiga-check.log 2>&1; echo "exit=$?" >> /t…
+  · edit /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/docs/local-dev.md
+  · edit /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/docs/local-dev.md
+  · edit /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/AGENTS.md
+  · edit /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/AGENTS.md
+  · edit /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/.agents/skills/debug-local/SKILL.md
+  · edit /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/docs/harness/log.md
+  · edit /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/docs/harness/log.md
+  · $ until grep -q "^exit=" /tmp/taiga-check.log; do sleep 30; done; tail -3 /tmp/taiga-check.…
+  · $ grep -c PASSED /tmp/taiga-check.log; grep -cE "FAILED|ERROR " /tmp/taiga-check.log
+  · $ until grep -q "^exit=" /tmp/taiga-check.log; do sleep 20; done; tail -3 /tmp/taiga-check.…
+  · $ env -i HOME=$HOME PATH=$PATH bash -c 'rtk proxy make setup 2>&1 | tail -8; rtk proxy make…
+  · $ node ~/Repos/unwritten/uw-harness/dist/cli.js check 2>&1 | tail -3; wc -l AGENTS.md; rtk …
+  · $ rtk proxy grep -rn "uw-harness:todo" --exclude-dir=.venv . | cut -c1-120
+  · edit /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/docs/local-dev.md
+  · $ sed -i '' 's/^check: lint migrations-check db-up ##/check: lint db-up migrations-check ##…
+  · edit /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/docs/architecture.md
+  · $ (rtk proxy make dev > /tmp/taiga-dev.log 2>&1 &) ; for i in $(seq 1 30); do curl -s -o /d…
+  · $ rtk proxy make db-reset > /tmp/taiga-reset.log 2>&1; echo "exit=$?"; grep -E "^->|Error|e…
+  · $ node ~/Repos/unwritten/uw-harness/dist/cli.js check 2>&1 | tail -2; rtk proxy make help |…
+  · StructuredOutput
+  ! the agent was not allowed to run: Write {"file_path":"/Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/.pre-commit-config.yaml","content":"# Git…
+  ! the agent was not allowed to run: Bash {"command":"rtk ls -la .claude 2>&1 | head -3; mkdir -p .claude && ln -s ../.agents/skills .claude/skills && rtk l…
+  ! the agent was not allowed to run: Bash {"command":"mkdir -p .claude && ln -s ../.agents/skills .claude/skills","description":"Create .claude/skills symli…
+  ! the agent was not allowed to run: Monitor {"description":"full gate failures and completion","timeout_ms":600000,"command":"tail -n 0 -f /tmp/taiga-check…
+  ✓ 25 files changed (51m 3s)
+
+▸ Verify
+  uw-harness linked .claude/skills to .agents/skills
+  ✓ uw-harness check passed
+  $ make setup
+  ✓ setup gate passed in 1s
+  $ make check-fast
+  ✓ fast gate passed in 30s: no test run found in the output
+  $ make check
+  ✓ full gate passed in 963s: 1751 tests
+  Measuring the baseline again on the base commit, with the dependencies that setup installed
+  $ pytest
+  ! before the harness: the test command did not run tests (exit 127, 0s)
+  ! Gate "fast" (`make check-fast`) passed but its output shows no test run. A gate must run tests.
+  claude fixes the failures
+  · $ cat Makefile; make check-fast 2>&1 | tail -30
+  · $ sed -i '' 's|\$(PYTEST) tests/unit --reuse-db -q|$(PYTEST) tests/unit --reuse-db -rA --tb…
+  · $ make check-fast > /tmp/cf.log 2>&1; echo "exit=$?"; tail -3 /tmp/cf.log; grep -c "^PASSED…
+  · $ rtk proxy tail -5 /tmp/cf.log; rtk proxy grep -c "PASSED" /tmp/cf.log
+  · $ wc -l /tmp/cf.log; /usr/bin/tail -n 8 /tmp/cf.log | cut -c1-120; grep -n "addopts\|\[tool…
+  · $ rtk proxy make check-fast > /tmp/cf.log 2>&1; echo "exit=$?"; wc -l < /tmp/cf.log; grep -…
+  · $ cat >> docs/harness/log.md <<'EOF' ## 2026-11-01: fast gate output shows the test run - *…
+  · $ grep -rn "TODO" AGENTS.md CLAUDE.md docs .agents 2>/dev/null | grep -v "^docs/harness/log…
+  · $ grep -rn "uw-harness:todo" --include=*.md . 2>/dev/null | grep -v .venv; grep -n -B3 "uw-…
+  · $ grep -rn "uw-harness:todo" AGENTS.md docs | cut -c1-120
+  · $ sed -n 1,9p docs/local-dev.md
+  · StructuredOutput
+
+▸ Verify, round 2
+  ✓ uw-harness check passed
+  $ make check-fast
+  ✓ fast gate passed in 27s: 238 tests
+  $ make check
+  ✓ full gate passed in 946s: 1751 tests
+
+▸ Report
+  Running the fast gate again on the files uw-harness wrote
+  $ make check-fast
+  ✓ fast gate passed in 34s: 238 tests
+
+  Knowledge
+  ✓ L1 An AGENTS.md at the root  AGENTS.md exists, 89 lines
+  ✓ L1 AGENTS.md matches the repository  13 commands and every link in AGENTS.md resolve
+  ✓ L1 An architecture overview with a diagram  docs/architecture.md has a diagram
+  ✓ L1 What the product does and for whom  docs/product.md exists
+  ✓ L2 Architecture decision records  2 decision records
+  ✓ L2 An implementation log  docs/harness/log.md exists
+  ✓ L1 Team agreements  CONTRIBUTING.md exists
+
+  Verification loops
+  ✓ L1 One entry point for tasks  Makefile: 18 tasks
+  ✓ L2 A fast gate  `make check-fast` verified: 238 tests reported
+  ✓ L2 A full gate  `make check` verified: 1751 tests reported
+  ✓ L1 Automated tests  120 test files (ignored: 11 without any test, 1 with only trivial assertions)
+  ✓ L2 CI runs the gate on every change  .github/workflows/tests-and-coverall.yml runs uw-harness verify
+  ✓ L3 Git hooks run the fast gate  .githooks exists
+
+  Local environment
+  ✓ L1 The app runs locally with one command  compose.yaml and target "dev"
+  ◐ L1 Configuration is documented, no secret in git  .env.example exists, but 1 file holds secret-looking values: settings/common.py (framework secret key)
+  ✓ L1 Toolchain versions are pinned  .python-version exists
+
+  Delivery and operations
+  ◐ L3 Deployment is explicit in the repository  docs/deploy.md has open questions for a human
+  ◐ L3 Production can be observed  docs/observability.md has open questions for a human
+
+  Capabilities
+  ✓ L2 Skills for repeated tasks  4 skills
+
+  Before  harness coverage 23/100  level 0 (not yet oriented)  3 pass, 4 partial, 12 missing
+  After   harness coverage 92/100  level 2 (self-checking)  16 pass, 3 partial, 0 missing
+
+  ✓ Gates verified by running them: fast (238 tests), full (1751 tests)
+  ! 1 test files only compare literals (for example `assert True`) and protect nothing: tests/integration/test_webhook_serializers.py
+  ! 7 files already in the repository hold secret-looking values: settings/common.py (framework secret key), tests/integration/test_application_tokens.py (password or secret), tests/integration/test_importers_jira_api.py (password or secret)
+
+  1 changes that reduce protection or touch the product, committed separately:
+  - M requirements-devel.in changed existing application code
+  Committed the harness as 9d797ff8 on uw-harness/20261101-1408. Changes for review are in 8157861c: `git revert 8157861c` drops them.
+
+  11 questions need a human
+  - settings/common.py:249 holds a hard-coded SECRET_KEY. Is it used by any real installation, and should it be read from an environment variable instead (with rotation)? AGENTS.md  https://docs.unwritten.sh/harness/requirements/env-example/
+  - Which local setup do developers use today (a local PostgreSQL, the taiga-docker repository, something else), and should compose.yaml also start RabbitMQ by default and taiga-events? docs/local-dev.md  https://docs.unwritten.sh/harness/requirements/local-env/
+  - Which environments exist (staging, production, on-premise customers) and what runs where? docs/deploy.md  https://docs.unwritten.sh/harness/guides/deploy/
+  - Who builds and pushes the taiga-back image, to which registry, with which tags, and from which repository or pipeline? docs/deploy.md  https://docs.unwritten.sh/harness/guides/deploy/
+  - How is tree.taiga.io deployed (tool, trigger, who can deploy), and where are the production compose or orchestration files? docs/deploy.md  https://docs.unwritten.sh/harness/guides/deploy/
+  - How is a release rolled back, and how are migrations handled during a rollback (backup and restore, reverse migrations, forward fix only)? docs/deploy.md  https://docs.unwritten.sh/harness/guides/deploy/
+  - What does the team check after a deploy (smoke test URL, logs, error rate), and who is told? docs/deploy.md  https://docs.unwritten.sh/harness/guides/deploy/
+  - Where are the production logs of the API and the Celery workers collected, and how does a developer get access? docs/observability.md  https://docs.unwritten.sh/harness/guides/observability/
+  - Is Sentry (or another error tracker) configured for production outside this repository, for example in a private settings file? Where do the team see errors? docs/observability.md  https://docs.unwritten.sh/harness/guides/observability/
+  - Which dashboards and metrics does the team use for production (request rate, latency, queue length, worker health)? docs/observability.md  https://docs.unwritten.sh/harness/guides/observability/
+  - What is the signal that production is broken (health check URL, key metric, alert rule) and which channel receives alerts? docs/observability.md  https://docs.unwritten.sh/harness/guides/observability/
+
+  Next steps
+  1. Read docs/harness/brief.md, then review the branch: git log main..uw-harness/20261101-1408
+  2. Answer the open questions: search for "uw-harness:todo" in docs/
+  3. Prove the harness on one real task: npx uw-harness prove
+     Fix missing imports in taiga/projects/userstories/filters.py (latent NameError)
+     UserStoryStatusesFilter.filter_queryset uses `logger` and `exc`, but neither is imported, so a non-integer `project` parameter raises NameError instead of BadRequest. The bug is latent on GET /api/v1/userstories, because CanViewUsFilterBackend runs first and already returns 400, but the filter is broken whenever it runs on its own.
+     - Done when: taiga/projects/userstories/filters.py imports `exc` from taiga.base and defines a module `logger`, like taiga/base/filters.py does
+     - Done when: A new test in tests/unit calls UserStoryStatusesFilter().filter_queryset with QUERY_PARAMS {'project': 'abc'} and expects taiga.base.exceptions.BadRequest
+     - Done when: `.venv/bin/flake8 --select=F821 taiga/projects/userstories/filters.py` reports nothing
+     - Done when: `make check-fast` passes
+  4. Push the branch and open a pull request. CI should run `npx uw-harness verify`.
+
+  Done in 89m 34s. Agent transcripts: /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/.git/uw-harness
+run exit 0

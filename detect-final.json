@@ -1,0 +1,248 @@
+{
+  "spec_version": 4,
+  "score": 86,
+  "level": 1,
+  "counts": {
+    "pass": 14,
+    "partial": 5,
+    "fail": 0
+  },
+  "facts": {
+    "git": {
+      "isRepo": true,
+      "branch": "HEAD",
+      "commits": 4492,
+      "lastCommit": "2026-11-01",
+      "dirty": false
+    },
+    "files": 2036,
+    "languages": [
+      {
+        "name": "Python",
+        "files": 933
+      },
+      {
+        "name": "Shell",
+        "files": 4
+      }
+    ],
+    "runners": [
+      {
+        "kind": "make",
+        "file": "Makefile",
+        "targets": [
+          "help",
+          "setup",
+          "venv",
+          "deps",
+          "hooks",
+          "db-up",
+          "db-down",
+          "db-migrate",
+          "db-reset",
+          "dev",
+          "worker",
+          "test",
+          "test-unit",
+          "lint",
+          "lint-full",
+          "migrations-check",
+          "check-fast",
+          "check"
+        ]
+      }
+    ],
+    "manifests": [
+      "manage.py",
+      "requirements-contribs.txt",
+      "requirements-devel.txt",
+      "requirements-tests.txt",
+      "requirements.txt"
+    ],
+    "harnessFiles": [
+      ".agents/skills/add-api-endpoint/SKILL.md",
+      ".agents/skills/debug-local/SKILL.md",
+      ".agents/skills/deploy/SKILL.md",
+      ".agents/skills/implement-change/SKILL.md",
+      ".claude/skills",
+      "AGENTS.md",
+      "CLAUDE.md",
+      "docs/harness/brief.md",
+      "docs/harness/log.md",
+      "docs/harness/state.json"
+    ]
+  },
+  "requirements": [
+    {
+      "id": "agents-file",
+      "area": "knowledge",
+      "level": 1,
+      "status": "pass",
+      "evidence": [
+        "AGENTS.md exists, 89 lines"
+      ]
+    },
+    {
+      "id": "agents-file-accurate",
+      "area": "knowledge",
+      "level": 1,
+      "status": "pass",
+      "evidence": [
+        "13 commands and every link in AGENTS.md resolve"
+      ]
+    },
+    {
+      "id": "architecture",
+      "area": "knowledge",
+      "level": 1,
+      "status": "pass",
+      "evidence": [
+        "docs/architecture.md has a diagram"
+      ]
+    },
+    {
+      "id": "product",
+      "area": "knowledge",
+      "level": 1,
+      "status": "pass",
+      "evidence": [
+        "docs/product.md exists"
+      ]
+    },
+    {
+      "id": "decisions",
+      "area": "knowledge",
+      "level": 2,
+      "status": "pass",
+      "evidence": [
+        "2 decision records"
+      ]
+    },
+    {
+      "id": "implementation-log",
+      "area": "knowledge",
+      "level": 2,
+      "status": "pass",
+      "evidence": [
+        "docs/harness/log.md exists"
+      ]
+    },
+    {
+      "id": "agreements",
+      "area": "knowledge",
+      "level": 1,
+      "status": "pass",
+      "evidence": [
+        "CONTRIBUTING.md exists"
+      ]
+    },
+    {
+      "id": "task-runner",
+      "area": "loops",
+      "level": 1,
+      "status": "pass",
+      "evidence": [
+        "Makefile: 18 tasks"
+      ]
+    },
+    {
+      "id": "fast-gate",
+      "area": "loops",
+      "level": 2,
+      "status": "partial",
+      "evidence": [
+        "the task runner changed since `make check-fast` was verified (run uw-harness verify)"
+      ]
+    },
+    {
+      "id": "full-gate",
+      "area": "loops",
+      "level": 2,
+      "status": "partial",
+      "evidence": [
+        "the task runner changed since `make check` was verified (run uw-harness verify)"
+      ]
+    },
+    {
+      "id": "tests",
+      "area": "loops",
+      "level": 1,
+      "status": "pass",
+      "evidence": [
+        "121 test files (ignored: 11 without any test)"
+      ]
+    },
+    {
+      "id": "ci",
+      "area": "loops",
+      "level": 2,
+      "status": "pass",
+      "evidence": [
+        ".github/workflows/tests-and-coverall.yml runs uw-harness verify"
+      ]
+    },
+    {
+      "id": "hooks",
+      "area": "loops",
+      "level": 3,
+      "status": "pass",
+      "evidence": [
+        ".githooks exists"
+      ]
+    },
+    {
+      "id": "local-env",
+      "area": "environment",
+      "level": 1,
+      "status": "pass",
+      "evidence": [
+        "compose.yaml and target \"dev\""
+      ]
+    },
+    {
+      "id": "env-example",
+      "area": "environment",
+      "level": 1,
+      "status": "partial",
+      "evidence": [
+        ".env.example exists, but 1 file holds secret-looking values: settings/common.py (framework secret key)"
+      ]
+    },
+    {
+      "id": "toolchain-pinned",
+      "area": "environment",
+      "level": 1,
+      "status": "pass",
+      "evidence": [
+        ".python-version exists"
+      ]
+    },
+    {
+      "id": "deploy-explicit",
+      "area": "operations",
+      "level": 3,
+      "status": "partial",
+      "evidence": [
+        "docs/deploy.md has open questions for a human"
+      ]
+    },
+    {
+      "id": "observability",
+      "area": "operations",
+      "level": 3,
+      "status": "partial",
+      "evidence": [
+        "docs/observability.md has open questions for a human"
+      ]
+    },
+    {
+      "id": "skills",
+      "area": "capabilities",
+      "level": 2,
+      "status": "pass",
+      "evidence": [
+        "4 skills"
+      ]
+    }
+  ]
+}

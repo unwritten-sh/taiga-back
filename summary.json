@@ -1,0 +1,329 @@
+{
+  "slug": "taiga",
+  "upstream": "https://github.com/taigaio/taiga-back",
+  "base_sha": "830978962987b0de8856f5bb6344ba06399dc1aa",
+  "agent": "claude 2.1.316 (Claude Code)",
+  "uw_harness": {
+    "version": "0.3.0",
+    "at_start": "95c8983cc832acd687c030f46a6d67ff4e9f15d5",
+    "notes": "finished_at 2026-11-01T15:11:48Z"
+  },
+  "branches": {
+    "harness": "uw-harness/20261101-1408",
+    "prove": "uw-harness/prove-20261101-1551"
+  },
+  "facts": {
+    "commits": 4490,
+    "first_commit": "2013-03-19",
+    "files": 2015,
+    "languages": [
+      {
+        "name": "Python",
+        "files": 933
+      },
+      {
+        "name": "Shell",
+        "files": 4
+      }
+    ]
+  },
+  "score": {
+    "before": 23,
+    "after": 92,
+    "final": 86
+  },
+  "level": {
+    "before": 0,
+    "after": 2,
+    "final": 1
+  },
+  "requirements": {
+    "before": {
+      "pass": 3,
+      "partial": 4,
+      "fail": 12
+    },
+    "after": {
+      "pass": 16,
+      "partial": 3,
+      "fail": 0
+    },
+    "final": {
+      "pass": 14,
+      "partial": 5,
+      "fail": 0
+    }
+  },
+  "not_passing_final": [
+    {
+      "id": "fast-gate",
+      "status": "partial",
+      "evidence": [
+        "the task runner changed since `make check-fast` was verified (run uw-harness verify)"
+      ]
+    },
+    {
+      "id": "full-gate",
+      "status": "partial",
+      "evidence": [
+        "the task runner changed since `make check` was verified (run uw-harness verify)"
+      ]
+    },
+    {
+      "id": "env-example",
+      "status": "partial",
+      "evidence": [
+        ".env.example exists, but 1 file holds secret-looking values: settings/common.py (framework secret key)"
+      ]
+    },
+    {
+      "id": "deploy-explicit",
+      "status": "partial",
+      "evidence": [
+        "docs/deploy.md has open questions for a human"
+      ]
+    },
+    {
+      "id": "observability",
+      "status": "partial",
+      "evidence": [
+        "docs/observability.md has open questions for a human"
+      ]
+    }
+  ],
+  "run_minutes": 89.6,
+  "baseline_in_run": {
+    "command": "pytest",
+    "ok": false,
+    "tests": null,
+    "note": "ran no test (exit 127)"
+  },
+  "baseline_measured_later": {
+    "command": "pytest",
+    "ok": true,
+    "tests": {
+      "ran": 1751,
+      "skipped": 0,
+      "failed": 0
+    },
+    "note": null,
+    "measured_at": "2026-11-01T16:13:10.841Z",
+    "how": "retryBaseline from uw-harness 491cab0, after the case run"
+  },
+  "gates": {
+    "setup": "make setup",
+    "fast": "make check-fast",
+    "full": "make check"
+  },
+  "verified": {
+    "fast": {
+      "command": "make check-fast",
+      "ok": true,
+      "at": "2026-11-01T14:35:00.009Z",
+      "commit": "83097896",
+      "tests": {
+        "ran": 238,
+        "skipped": 0,
+        "failed": 0
+      },
+      "fingerprint": "36814488c5030d71"
+    },
+    "full": {
+      "command": "make check",
+      "ok": true,
+      "at": "2026-11-01T14:35:00.009Z",
+      "commit": "83097896",
+      "tests": {
+        "ran": 1751,
+        "skipped": 0,
+        "failed": 0
+      },
+      "fingerprint": "36814488c5030d71"
+    }
+  },
+  "findings": {
+    "skipped_test_files": [],
+    "relaxed_checks": [],
+    "review_commit": [
+      {
+        "path": "requirements-devel.in",
+        "reason": "changed existing application code"
+      }
+    ],
+    "secrets_added": [],
+    "secrets_in_repo": [
+      {
+        "file": "settings/common.py",
+        "kind": "framework secret key"
+      },
+      {
+        "file": "tests/integration/test_application_tokens.py",
+        "kind": "password or secret"
+      },
+      {
+        "file": "tests/integration/test_importers_jira_api.py",
+        "kind": "password or secret"
+      },
+      {
+        "file": "tests/integration/test_projects.py",
+        "kind": "password or secret"
+      },
+      {
+        "file": "tests/integration/test_users.py",
+        "kind": "password or secret"
+      },
+      {
+        "file": "tests/unit/auth/test_backends.py",
+        "kind": "private key"
+      },
+      {
+        "file": "tests/unit/auth/test_token_denylist.py",
+        "kind": "password or secret"
+      }
+    ],
+    "trivial_test_files": [
+      "tests/integration/test_webhook_serializers.py"
+    ],
+    "coverage_problems": [],
+    "blocked": []
+  },
+  "open_questions": [
+    {
+      "file": "AGENTS.md",
+      "requirement": "env-example",
+      "question": "settings/common.py:249 holds a hard-coded SECRET_KEY. Is it used by any real installation, and should it be read from an environment variable instead (with rotation)?"
+    },
+    {
+      "file": "docs/local-dev.md",
+      "requirement": "local-env",
+      "question": "Which local setup do developers use today (a local PostgreSQL, the taiga-docker repository, something else), and should compose.yaml also start RabbitMQ by default and taiga-events?"
+    },
+    {
+      "file": "docs/deploy.md",
+      "requirement": "deploy-explicit",
+      "question": "Which environments exist (staging, production, on-premise customers) and what runs where?"
+    },
+    {
+      "file": "docs/deploy.md",
+      "requirement": "deploy-explicit",
+      "question": "Who builds and pushes the taiga-back image, to which registry, with which tags, and from which repository or pipeline?"
+    },
+    {
+      "file": "docs/deploy.md",
+      "requirement": "deploy-explicit",
+      "question": "How is tree.taiga.io deployed (tool, trigger, who can deploy), and where are the production compose or orchestration files?"
+    },
+    {
+      "file": "docs/deploy.md",
+      "requirement": "deploy-explicit",
+      "question": "How is a release rolled back, and how are migrations handled during a rollback (backup and restore, reverse migrations, forward fix only)?"
+    },
+    {
+      "file": "docs/deploy.md",
+      "requirement": "deploy-explicit",
+      "question": "What does the team check after a deploy (smoke test URL, logs, error rate), and who is told?"
+    },
+    {
+      "file": "docs/observability.md",
+      "requirement": "observability",
+      "question": "Where are the production logs of the API and the Celery workers collected, and how does a developer get access?"
+    },
+    {
+      "file": "docs/observability.md",
+      "requirement": "observability",
+      "question": "Is Sentry (or another error tracker) configured for production outside this repository, for example in a private settings file? Where do the team see errors?"
+    },
+    {
+      "file": "docs/observability.md",
+      "requirement": "observability",
+      "question": "Which dashboards and metrics does the team use for production (request rate, latency, queue length, worker health)?"
+    },
+    {
+      "file": "docs/observability.md",
+      "requirement": "observability",
+      "question": "What is the signal that production is broken (health check URL, key metric, alert rule) and which channel receives alerts?"
+    }
+  ],
+  "files_added_or_changed": 23,
+  "proof": {
+    "task": {
+      "title": "Fix missing imports in taiga/projects/userstories/filters.py (latent NameError)",
+      "description": "UserStoryStatusesFilter.filter_queryset uses `logger` and `exc`, but neither is imported, so a non-integer `project` parameter raises NameError instead of BadRequest. The bug is latent on GET /api/v1/userstories, because CanViewUsFilterBackend runs first and already returns 400, but the filter is broken whenever it runs on its own.",
+      "acceptance": [
+        "taiga/projects/userstories/filters.py imports `exc` from taiga.base and defines a module `logger`, like taiga/base/filters.py does",
+        "A new test in tests/unit calls UserStoryStatusesFilter().filter_queryset with QUERY_PARAMS {'project': 'abc'} and expects taiga.base.exceptions.BadRequest",
+        "`.venv/bin/flake8 --select=F821 taiga/projects/userstories/filters.py` reports nothing",
+        "`make check-fast` passes"
+      ]
+    },
+    "status": "done",
+    "gates_ok": true,
+    "fix_rounds": 0,
+    "tests_before": {
+      "ran": 1751,
+      "skipped": 0,
+      "failed": 0
+    },
+    "tests_after": {
+      "ran": 1752,
+      "skipped": 0,
+      "failed": 0
+    },
+    "failed_before": [],
+    "acceptance_met": 4,
+    "acceptance_requested": 4,
+    "human_needed": [],
+    "harness_gaps": [
+      {
+        "file": "AGENTS.md",
+        "problem": "AGENTS.md does not warn that the local rtk output filter truncates `make check-fast` output: I saw only warnings and '248 lines truncated', with no pass/fail summary. The workaround (`rtk proxy make check-fast`) is only written in docs/harness/log.md. It should be in AGENTS.md next to the gate command, or the gate should print a short last line with the result."
+      },
+      {
+        "file": ".agents/skills/implement-change/SKILL.md",
+        "problem": "The skill gives only integration-test examples (`tests/integration/test_userstories.py`). It does not say that small units such as filter backends can be tested in tests/unit with a mocked request (`mock.Mock(QUERY_PARAMS=...)`) and no database. I found this pattern myself."
+      }
+    ],
+    "relaxed_checks": [],
+    "skipped_test_files": [],
+    "duration_s": 2061,
+    "prove_minutes": 34.9
+  },
+  "control": {
+    "status": "partial",
+    "criteria_met": 3,
+    "criteria_requested": 4,
+    "unmet": [
+      "`make check-fast` passes"
+    ],
+    "human_needed": [
+      {
+        "question": "What should `make check-fast` run? Is the Makefile missing from this branch, or does the team mean another command (for example pytest tests/unit plus flake8)?",
+        "why": "The acceptance criterion names a target that does not exist in the repository. I should not invent its content or add a Makefile that the task does not ask for."
+      }
+    ],
+    "duration_s": 79,
+    "files_changed": [
+      "taiga/projects/userstories/filters.py",
+      "tests/unit/test_userstories_filters.py"
+    ],
+    "own_tests": {
+      "command": "pytest",
+      "ok": true,
+      "tests": {
+        "ran": 1752,
+        "skipped": 0,
+        "failed": 0
+      },
+      "note": null
+    },
+    "own_tests_measured_later": null,
+    "harness_gates": {
+      "ok": true,
+      "tests": {
+        "ran": 1752,
+        "skipped": 0,
+        "failed": 0
+      }
+    }
+  }
+}

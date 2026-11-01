@@ -1,0 +1,63 @@
+uw-harness prove  /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo
+
+▸ Task
+  Fix missing imports in taiga/projects/userstories/filters.py (latent NameError)
+  UserStoryStatusesFilter.filter_queryset uses `logger` and `exc`, but neither is imported, so a non-integer `project` parameter raises NameError instead of BadRequest. The bug is latent on GET /api/v1/userstories, because CanViewUsFilterBackend runs first and already returns 400, but the filter is broken whenever it runs on its own.
+  - Done when: taiga/projects/userstories/filters.py imports `exc` from taiga.base and defines a module `logger`, like taiga/base/filters.py does
+  - Done when: A new test in tests/unit calls UserStoryStatusesFilter().filter_queryset with QUERY_PARAMS {'project': 'abc'} and expects taiga.base.exceptions.BadRequest
+  - Done when: `.venv/bin/flake8 --select=F821 taiga/projects/userstories/filters.py` reports nothing
+  - Done when: `make check-fast` passes
+  Agent: claude. It works alone on a new branch; you review the result.
+
+▸ Before
+  $ make setup
+  ✓ setup gate passed in 1s
+  $ make check-fast
+  ✓ fast gate passed in 26s: 238 tests
+  $ make check
+  ✓ full gate passed in 918s: 1751 tests
+
+▸ Work
+  Created branch uw-harness/prove-20261101-1551 from uw-harness/20261101-1408
+  · read /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/taiga/projects/userstories/filters.py
+  · search ^import|^from|^logger
+  · read /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/.agents/skills/implement-change/SKILL.md
+  · $ ls tests/unit | head -50 && head -30 tests/unit/test_slug.py && ls .venv/bin/pytest
+  · write /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/tests/unit/test_userstories_filters.py
+  · $ .venv/bin/pytest tests/unit/test_userstories_filters.py -q 2>&1 | tail -15
+  · edit /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/taiga/projects/userstories/filters.py
+  · $ .venv/bin/pytest tests/unit/test_userstories_filters.py -q 2>&1 | tail -3; .venv/bin/flak…
+  · $ rtk proxy make check-fast > /tmp/cf.log 2>&1; echo "exit=$?"; grep -E "passed|failed|erro…
+  · $ tail -30 docs/harness/log.md
+  · $ grep -n "^#" docs/harness/log.md; sed -n 1,25p docs/harness/log.md
+  · edit /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/docs/harness/log.md
+  · $ git status --short && git diff --stat
+  · StructuredOutput
+  ✓ agent reports: done, 3 files changed
+
+▸ Verify
+  $ make check-fast
+  ✓ fast gate passed in 27s: 239 tests
+  $ make check
+  ✓ full gate passed in 964s: 1752 tests
+
+▸ Report
+  Running the fast gate again on the files uw-harness wrote
+  $ make check-fast
+  ✓ fast gate passed in 32s: 239 tests
+  Agent status: done. Acceptance criteria met (reported by the agent): 4 of 4
+    ✓ filters.py imports `exc` from taiga.base and defines a module `logger`, like taiga/base/filters.py Added `import logging`, `from taiga.base import exceptions as exc`, `logger = logging.getLogger(__name__)`, which is the same pattern as taiga/base/filters.py lines 8, 17 and 21.
+    ✓ New test in tests/unit calls UserStoryStatusesFilter().filter_queryset with QUERY_PARAMS {'project': 'abc'} and expects BadRequest tests/unit/test_userstories_filters.py::test_userstory_statuses_filter_with_non_integer_project_raises_bad_request. It failed with `NameError: name 'logger' is not defined` before the fix and passes after it.
+    ✓ `.venv/bin/flake8 --select=F821 taiga/projects/userstories/filters.py` reports nothing No output, exit 0.
+    ✓ `make check-fast` passes `rtk proxy make check-fast` exit=0, '239 passed, 187 warnings in 25.09s'.
+  ✓ Gates after the task. Tests before: 1751 tests. After: 1752 tests.
+  Fix rounds after a gate failed: 0. Questions for a human: 0.
+
+  Gaps in the harness reported by the agent
+  - AGENTS.md: AGENTS.md does not warn that the local rtk output filter truncates `make check-fast` output: I saw only warnings and '248 lines truncated', with no pass/fail summary. The workaround (`rtk proxy make check-fast`) is only written in docs/harness/log.md. It should be in AGENTS.md next to the gate command, or the gate should print a short last line with the result.
+  - .agents/skills/implement-change/SKILL.md: The skill gives only integration-test examples (`tests/integration/test_userstories.py`). It does not say that small units such as filter backends can be tested in tests/unit with a mocked request (`mock.Mock(QUERY_PARAMS=...)`) and no database. I found this pattern myself.
+
+  ✓ Done without human help.
+  Committed as 718aede1 on uw-harness/prove-20261101-1551. Review it like any pull request.
+  Done in 34m 53s. Agent transcripts: /Users/victor/Repos/unwritten/uw-harness-cases/taiga/repo/.git/uw-harness
+prove exit 0

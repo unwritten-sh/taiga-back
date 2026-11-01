@@ -1,0 +1,12 @@
+{
+  "command": "pytest",
+  "ok": true,
+  "tests": {
+    "ran": 1751,
+    "skipped": 0,
+    "failed": 0
+  },
+  "note": null,
+  "measured_at": "2026-11-01T16:13:10.841Z",
+  "how": "retryBaseline from uw-harness 491cab0, after the case run"
+}

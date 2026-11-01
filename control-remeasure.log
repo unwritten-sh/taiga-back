@@ -1,0 +1,14 @@
+fatal: '/Users/victor/Repos/unwritten/uw-harness-cases/taiga/control/control-tree' is not a working tree
+Preparing worktree (detached HEAD 83097896)
+  $ pytest
+  ✓ before the harness: 1752 tests (926s)
+fatal: '/Users/victor/Repos/unwritten/uw-harness-cases/taiga/control/eval-tree' is not a working tree
+Preparing worktree (detached HEAD 8157861c)
+  $ make setup
+  ✓ setup gate passed in 1s
+  $ make check-fast
+  ✓ fast gate passed in 36s: 239 tests
+  $ make check
+  ✓ full gate passed in 984s: 1752 tests
+control: partial, 3/4 criteria, 1 questions, 79s, own tests: 1752 ran, 0 failed, harness gates: pass
+exit 0
