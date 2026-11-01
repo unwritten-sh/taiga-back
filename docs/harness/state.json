@@ -1,0 +1,191 @@
+{
+  "tool_version": "0.3.0",
+  "spec_version": 4,
+  "agent": "claude",
+  "updated_at": "2026-11-01T14:35:00.009Z",
+  "score": {
+    "before": 23,
+    "after": 92
+  },
+  "level": {
+    "before": 0,
+    "after": 2
+  },
+  "gates": {
+    "setup": "make setup",
+    "fast": "make check-fast",
+    "full": "make check"
+  },
+  "verified": {
+    "fast": {
+      "command": "make check-fast",
+      "ok": true,
+      "at": "2026-11-01T14:35:00.009Z",
+      "commit": "83097896",
+      "tests": {
+        "ran": 238,
+        "skipped": 0,
+        "failed": 0
+      },
+      "fingerprint": "36814488c5030d71"
+    },
+    "full": {
+      "command": "make check",
+      "ok": true,
+      "at": "2026-11-01T14:35:00.009Z",
+      "commit": "83097896",
+      "tests": {
+        "ran": 1751,
+        "skipped": 0,
+        "failed": 0
+      },
+      "fingerprint": "36814488c5030d71"
+    }
+  },
+  "answers": [],
+  "todos": [
+    {
+      "requirement": "env-example",
+      "question": "settings/common.py:249 holds a hard-coded SECRET_KEY. Is it used by any real installation, and should it be read from an environment variable instead (with rotation)?",
+      "file": "AGENTS.md"
+    },
+    {
+      "requirement": "local-env",
+      "question": "Which local setup do developers use today (a local PostgreSQL, the taiga-docker repository, something else), and should compose.yaml also start RabbitMQ by default and taiga-events?",
+      "file": "docs/local-dev.md"
+    },
+    {
+      "requirement": "deploy-explicit",
+      "question": "Which environments exist (staging, production, on-premise customers) and what runs where?",
+      "file": "docs/deploy.md"
+    },
+    {
+      "requirement": "deploy-explicit",
+      "question": "Who builds and pushes the taiga-back image, to which registry, with which tags, and from which repository or pipeline?",
+      "file": "docs/deploy.md"
+    },
+    {
+      "requirement": "deploy-explicit",
+      "question": "How is tree.taiga.io deployed (tool, trigger, who can deploy), and where are the production compose or orchestration files?",
+      "file": "docs/deploy.md"
+    },
+    {
+      "requirement": "deploy-explicit",
+      "question": "How is a release rolled back, and how are migrations handled during a rollback (backup and restore, reverse migrations, forward fix only)?",
+      "file": "docs/deploy.md"
+    },
+    {
+      "requirement": "deploy-explicit",
+      "question": "What does the team check after a deploy (smoke test URL, logs, error rate), and who is told?",
+      "file": "docs/deploy.md"
+    },
+    {
+      "requirement": "observability",
+      "question": "Where are the production logs of the API and the Celery workers collected, and how does a developer get access?",
+      "file": "docs/observability.md"
+    },
+    {
+      "requirement": "observability",
+      "question": "Is Sentry (or another error tracker) configured for production outside this repository, for example in a private settings file? Where do the team see errors?",
+      "file": "docs/observability.md"
+    },
+    {
+      "requirement": "observability",
+      "question": "Which dashboards and metrics does the team use for production (request rate, latency, queue length, worker health)?",
+      "file": "docs/observability.md"
+    },
+    {
+      "requirement": "observability",
+      "question": "What is the signal that production is broken (health check URL, key metric, alert rule) and which channel receives alerts?",
+      "file": "docs/observability.md"
+    }
+  ],
+  "first_task": {
+    "title": "Fix missing imports in taiga/projects/userstories/filters.py (latent NameError)",
+    "description": "UserStoryStatusesFilter.filter_queryset uses `logger` and `exc`, but neither is imported, so a non-integer `project` parameter raises NameError instead of BadRequest. The bug is latent on GET /api/v1/userstories, because CanViewUsFilterBackend runs first and already returns 400, but the filter is broken whenever it runs on its own.",
+    "acceptance": [
+      "taiga/projects/userstories/filters.py imports `exc` from taiga.base and defines a module `logger`, like taiga/base/filters.py does",
+      "A new test in tests/unit calls UserStoryStatusesFilter().filter_queryset with QUERY_PARAMS {'project': 'abc'} and expects taiga.base.exceptions.BadRequest",
+      "`.venv/bin/flake8 --select=F821 taiga/projects/userstories/filters.py` reports nothing",
+      "`make check-fast` passes"
+    ]
+  },
+  "files": [
+    ".agents/skills/add-api-endpoint/SKILL.md",
+    ".agents/skills/debug-local/SKILL.md",
+    ".agents/skills/deploy/SKILL.md",
+    ".agents/skills/implement-change/SKILL.md",
+    ".env.example",
+    ".githooks/pre-push",
+    ".github/workflows/tests-and-coverall.yml",
+    ".gitignore",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "CONTRIBUTING.md",
+    "Makefile",
+    "compose.yaml",
+    "docs/architecture.md",
+    "docs/decisions/0001-record-architecture-decisions.md",
+    "docs/decisions/0002-celery-with-rabbitmq-and-pickle.md",
+    "docs/deploy.md",
+    "docs/harness/log.md",
+    "docs/local-dev.md",
+    "docs/observability.md",
+    "docs/product.md",
+    "requirements-devel.in",
+    "requirements-devel.txt"
+  ],
+  "baseline": {
+    "command": "pytest",
+    "ok": false,
+    "tests": null,
+    "note": "ran no test (exit 127)"
+  },
+  "proofs": [],
+  "last_run": {
+    "skipped_test_files": [],
+    "relaxed_checks": [],
+    "review_commit": [
+      {
+        "path": "requirements-devel.in",
+        "reason": "changed existing application code"
+      }
+    ],
+    "secrets_added": [],
+    "secrets_in_repo": [
+      {
+        "file": "settings/common.py",
+        "kind": "framework secret key"
+      },
+      {
+        "file": "tests/integration/test_application_tokens.py",
+        "kind": "password or secret"
+      },
+      {
+        "file": "tests/integration/test_importers_jira_api.py",
+        "kind": "password or secret"
+      },
+      {
+        "file": "tests/integration/test_projects.py",
+        "kind": "password or secret"
+      },
+      {
+        "file": "tests/integration/test_users.py",
+        "kind": "password or secret"
+      },
+      {
+        "file": "tests/unit/auth/test_backends.py",
+        "kind": "private key"
+      },
+      {
+        "file": "tests/unit/auth/test_token_denylist.py",
+        "kind": "password or secret"
+      }
+    ],
+    "trivial_test_files": [
+      "tests/integration/test_webhook_serializers.py"
+    ],
+    "coverage_problems": [],
+    "blocked": []
+  }
+}

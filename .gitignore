@@ -22,3 +22,7 @@ static
 .direnv
 settings/config.py
 celerybeat-schedule
+.pytest_cache/
+.coverage.*
+coverage.xml
+htmlcov/

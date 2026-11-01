@@ -38,12 +38,16 @@ factory-boy==3.3.3
     # via -r requirements-devel.in
 faker==38.2.0
     # via factory-boy
+flake8==7.4.1
+    # via -r requirements-devel.in
 idna==3.11
     # via
     #   -c requirements.txt
     #   requests
 iniconfig==2.3.0
     # via pytest
+mccabe==0.7.0
+    # via flake8
 packaging==25.0
     # via
     #   -c requirements.txt
@@ -54,10 +58,14 @@ pyasn1==0.6.1
     # via
     #   python-jose
     #   rsa
+pycodestyle==2.15.0
+    # via flake8
 pycparser==2.23
     # via
     #   -c requirements.txt
     #   cffi
+pyflakes==4.0.3
+    # via flake8
 pygments==2.19.2
     # via
     #   -c requirements.txt

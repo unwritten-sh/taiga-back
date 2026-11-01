@@ -52,15 +52,17 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-${{ matrix.python-version }}-pip-
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip wheel
-        pip install -r requirements.txt -r requirements-devel.txt
-      if: steps.cache.outputs.cache-hit != 'true'
+    - name: Set up Node 20 (for uw-harness)
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
 
-    - name: Test with pytest and calculate coverage
-      run: |
-        coverage run --source=taiga --omit='*tests*,*commands*,*migrations*,*admin*,*.jinja,*dashboard*,*settings*,*wsgi*,*questions*,*documents*' -m pytest -v --tb=native --pythonwarnings=default
+    # uw-harness verify runs `uw-harness check` (AGENTS.md matches the repository),
+    # then `make setup`, `make check-fast` and `make check` (lint, migrations check,
+    # whole suite with coverage). `make check` writes .coverage for Coveralls.
+    # The postgres service above is used through tests/config.py (GITHUB_WORKFLOW).
+    - name: Verify the harness and run the gates
+      run: npx -y uw-harness verify
 
     - name: Publish in Coveralls
       uses: AndreMiras/coveralls-python-action@develop
