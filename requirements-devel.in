@@ -5,3 +5,4 @@ pytest
 pytest-django
 factory-boy
 python-jose[cryptography]>=3.5.0
+flake8
