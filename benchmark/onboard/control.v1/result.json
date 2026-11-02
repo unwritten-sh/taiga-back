@@ -1,0 +1,17 @@
+{
+  "arm": "control",
+  "seconds": 1179,
+  "result": {
+    "status": "done",
+    "test_command": ".venv/bin/python -m pytest",
+    "setup_steps": [
+      "Read the README, the CI workflow (.github/workflows/tests-and-coverall.yml), tox.ini, pytest.ini and tests/config.py. Tests use Python 3.10, DJANGO_SETTINGS_MODULE=tests.config, and PostgreSQL on localhost:5432 with database 'taiga', user 'taiga' and password 'taiga'. CELERY_ENABLED is False, so RabbitMQ is not needed even though CI starts it.",
+      "Found a Homebrew PostgreSQL 14 already running on localhost:5432 (data dir /opt/homebrew/var/postgresql@14). It already has a 'taiga' role with CREATEDB and a 'taiga' database owned by that role, so it matches tests/config.py. I used it as it is and did not start a new database.",
+      "uv venv --python 3.10 .venv  (uses uv-managed CPython 3.10.18; .venv is in .gitignore)",
+      "export PATH=/opt/homebrew/opt/libpq/bin:$PATH LDFLAGS=-L/opt/homebrew/opt/openssl@3/lib && uv pip install --python .venv/bin/python -r requirements.txt -r requirements-devel.txt  (psycopg2 builds from source and needs pg_config and the OpenSSL library path on macOS. Without LDFLAGS the link fails with \"library 'ssl' not found\".)",
+      "Ran the full suite: .venv/bin/python -m pytest"
+    ],
+    "summary": "I set up a Python 3.10 virtualenv in .venv with uv and installed requirements.txt and requirements-devel.txt. psycopg2 builds from source on macOS, so the install needs libpq's pg_config on PATH and LDFLAGS pointing to Homebrew openssl@3. The tests use the local Homebrew PostgreSQL 14 on localhost:5432, which already had the taiga/taiga role and database that tests/config.py expects. RabbitMQ is not needed because Celery is turned off in the test settings. The full suite passed: 1751 tests in about 17.5 minutes, run serially because pytest-xdist is not installed. I did not change any repository files and did not commit anything.",
+    "human_needed": []
+  }
+}

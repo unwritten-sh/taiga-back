@@ -1,0 +1,108 @@
+{
+  "task": "taiga-1",
+  "arm": "control",
+  "start": "a1333b590a6bb9b91dd3c399966933ad30ddd970",
+  "seconds": 1109,
+  "result": {
+    "status": "done",
+    "summary": "Invitation tokens now expire after 7 days, the same period as project transfer tokens. There is one helper, `generate_invitation_token()` in `taiga/projects/services/invitations.py`, which returns the token and its expiration date together. Two small wrappers sit on top of it: `set_invitation_token` and `rotate_invitation_token`. Every place that issues a token goes through it: single membership creation in the API, bulk membership creation, project import (both the importer API and dump import use `_store_membership`), and the `sample_data` command. A token is valid only for a pending invitation whose `token_expires_at` is in the future. Tokens with no expiration date (issued before this change) count as expired. This check is in one queryset, `get_valid_invitations()`, which is used both by `get_membership_by_token` (login with `invitation_token` and private registration) and by `InvitationViewSet` (get invitation by token). Expired or legacy tokens therefore return 404 and do not accept the invitation. On private registration the new user is rolled back. Resending an invitation now gives it a new token and a new expiration date, so the old link returns 404. One change beyond the request: `MembershipValidator` now marks `token` and `token_expires_at` as read-only. Before, an API client could set its own token and expiration date when it created a membership, which would break the rule that the server always issues them together. Both membership factories now set `token_expires_at` to one week from now. The full suite passed: 1765 tests. I ran it against a temporary local Postgres cluster in /tmp, which I stopped and deleted afterwards. I wanted to also confirm that the new tests fail without the source change, but that command (temporarily reverting taiga/) was denied, so that check was not done.",
+    "changes": [
+      {
+        "path": "taiga/projects/services/invitations.py",
+        "summary": "Added INVITATION_TOKEN_LIFETIME (7 days), generate_invitation_token(), set_invitation_token(), rotate_invitation_token() and get_valid_invitations(), which keeps only pending invitations with token_expires_at > now. get_membership_by_token now uses get_valid_invitations, so expired and legacy tokens raise NotFound."
+      },
+      {
+        "path": "taiga/projects/services/__init__.py",
+        "summary": "Exported the new invitation helpers."
+      },
+      {
+        "path": "taiga/projects/services/members.py",
+        "summary": "Bulk creation sets the token and token_expires_at through generate_invitation_token. Removed the unused uuid import."
+      },
+      {
+        "path": "taiga/projects/api.py",
+        "summary": "MembershipViewSet.pre_save issues the token through set_invitation_token. resend_invitation rotates the token and expiration date of pending invitations before sending the email. InvitationViewSet uses get_valid_invitations() as its queryset, so expired and legacy tokens return 404."
+      },
+      {
+        "path": "taiga/projects/validators.py",
+        "summary": "token and token_expires_at are read-only in MembershipValidator, so clients cannot choose their own token or expiration date."
+      },
+      {
+        "path": "taiga/export_import/services/store.py",
+        "summary": "Imported memberships get their token and expiration date from set_invitation_token. Removed the unused uuid import."
+      },
+      {
+        "path": "taiga/projects/management/commands/sample_data.py",
+        "summary": "Sample invitations use generate_invitation_token, so they get a valid expiration date."
+      },
+      {
+        "path": "tests/factories.py",
+        "summary": "MembershipFactory and InvitationFactory set token_expires_at to now + 1 week."
+      },
+      {
+        "path": "tests/integration/test_auth.py",
+        "summary": "New tests: login with an expired or legacy invitation_token returns 404 and does not accept the invitation; private registration with a valid token returns 201 and uses up the token; private registration with an expired or legacy token returns 404 and does not create the user."
+      },
+      {
+        "path": "tests/integration/test_memberships.py",
+        "summary": "New tests: lifetime is 7 days; the helper output; bulk, API and bulk-API creation set a valid expiration date; client-supplied token and expiration date are ignored; GET invitation by token returns 200 when valid and 404 when expired or legacy; resend rotates the token (old link 404, new link 200, new token in the email); resending an expired or legacy invitation gives a new valid token."
+      },
+      {
+        "path": "tests/integration/test_importer_api.py",
+        "summary": "The import test now checks that the imported invitation gets an expiration date about one week ahead."
+      }
+    ],
+    "acceptance": [
+      {
+        "criterion": "Every invitation token issuer sets the token and expiration date together through one shared helper",
+        "met": true,
+        "evidence": "API create (pre_save), bulk create (get_members_from_bulk), import (_store_membership) and sample_data all go through generate_invitation_token. A grep shows no other place assigns a uuid token to a membership. Covered by test_api_create_invitation_sets_token_expiration, test_api_create_bulk_invitations_sets_token_expiration, test_get_members_from_bulk_sets_token_expiration and test_valid_project_import_with_membership_uuid_rewrite."
+      },
+      {
+        "criterion": "Expired and legacy (null expiration) tokens are rejected everywhere: get invitation returns 404, login and register with them return 404 and do not accept",
+        "met": true,
+        "evidence": "Both lookup paths use get_valid_invitations(). Tests test_api_get_invitation_by_expired_token, test_get_auth_token_with_expired_project_invitation and test_private_register_with_expired_project_invitation each run with an expired date and with None, and all pass."
+      },
+      {
+        "criterion": "Resending rotates the token and refreshes the expiration date; old links stop working",
+        "met": true,
+        "evidence": "test_api_resend_invitation_rotates_token (old token 404, new token 200, new token in the email body) and test_api_resend_expired_invitation_gives_a_new_valid_token pass."
+      },
+      {
+        "criterion": "Membership test factories create invitations valid for one week",
+        "met": true,
+        "evidence": "tests/factories.py: token_expires_at = LazyFunction(now + timedelta(weeks=1)) on MembershipFactory and InvitationFactory."
+      },
+      {
+        "criterion": "Change is covered by tests",
+        "met": true,
+        "evidence": "New tests in test_auth.py, test_memberships.py and test_importer_api.py; the targeted run gave 187 passed. I could not confirm that the new tests fail without the source change, because the command to revert taiga/ temporarily was denied."
+      },
+      {
+        "criterion": "Existing test suite still passes",
+        "met": true,
+        "evidence": "Full run with `.venv/bin/pytest tests`: 1765 passed in 821s."
+      }
+    ],
+    "human_needed": [],
+    "harness_used": [
+      "Existing tests for password recovery token expiration (tests/integration/test_users.py) and for invitation token reuse (test_auth.py) were good patterns to follow.",
+      "The repo's .venv with pytest and pytest.ini (DJANGO_SETTINGS_MODULE=tests.config).",
+      "A local Homebrew postgresql@14. I ran a temporary trust-auth cluster in /tmp with a superuser role taiga/taiga, then stopped and deleted it."
+    ],
+    "harness_gaps": [
+      {
+        "file": null,
+        "problem": "No CLAUDE.md or AGENTS.md, and no documented way to run tests. The suite needs a running Postgres on 127.0.0.1:5432 with role taiga/taiga allowed to create databases, and nothing in the repo says this or provides a script or compose file for it."
+      },
+      {
+        "file": "requirements-devel.txt",
+        "problem": "pytest-xdist is not installed, so the full suite runs serially and takes about 14 minutes."
+      },
+      {
+        "file": "taiga/projects/services/transfer.py",
+        "problem": "The 7-day transfer token lifetime is hard-coded inline (timedelta(days=7)) instead of in a named setting, so the invitation lifetime copies the value rather than sharing a constant."
+      }
+    ]
+  }
+}

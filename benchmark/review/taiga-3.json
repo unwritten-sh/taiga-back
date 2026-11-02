@@ -1,0 +1,23 @@
+{
+  "task": "taiga-3",
+  "A": "control",
+  "B": "harness",
+  "answer": {
+    "A": {
+      "scope": 4,
+      "conventions": 4,
+      "tests": 5,
+      "readability": 4,
+      "notes": "Clean implementation. CaseInsensitiveDict handles headers simply, and the file-name logic is split into a helper that is unit-tested. Description replacement uses a global re.sub with a lookahead. That is simple, but it rewrites the URL everywhere, not just inside image syntax. Saving the new description takes a separate UPDATE right before the existing UPDATE, so there is one extra query per changed object. Tests are thorough: helper unit tests (traversal, RFC 2231 filenames, '..'), deduplication, mixed failures (exception, non-image, success), a render with no image, and both import flows with an image that fails. The tests build the importer with __new__, which is a bit hacky."
+    },
+    "B": {
+      "scope": 3,
+      "conventions": 3,
+      "tests": 4,
+      "readability": 4,
+      "notes": "Replacement is limited to matches of the existing image regexes, which is more precise. The _import_description_inline_images helper folds the description into the existing single update() call, which is neat. Downsides: unrelated import reordering (it moves `import requests`), a hand-rolled case-insensitive _get_header where CaseInsensitiveDict would do, and the warning log drops exc_info. Tests use the real constructor with GithubClient patched and cover both flows in one parametrized test. They also check that modified_date is kept. But the filename edge cases have no unit tests, the issues flow does not explicitly set up default severity, priority and type, and the generator-throw trick in the lambda is hard to read."
+    },
+    "merge_first": "A",
+    "why": "Both changes do the task correctly. I'd merge A first: its tests are more thorough, including unit tests for the helpers and separate tests for the user story and issue flows, and it avoids B's unrelated import churn and hand-rolled header lookup. B's tighter URL replacement and single update query are nice, but they don't outweigh this."
+  }
+}

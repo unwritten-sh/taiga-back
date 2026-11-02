@@ -1,0 +1,60 @@
+[
+  {
+    "sha": "94a0c077bdb852077910d815b7b1962e1c8ffb90",
+    "date": "2026-10-29",
+    "subject": "fix: expire invitation tokens after one week",
+    "product": [
+      "taiga/export_import/services/store.py",
+      "taiga/projects/api.py",
+      "taiga/projects/services/invitations.py",
+      "taiga/projects/services/members.py"
+    ],
+    "tests": [
+      "tests/factories.py",
+      "tests/integration/test_memberships.py",
+      "tests/integration/test_auth.py"
+    ],
+    "changed": 50,
+    "revert_patch": "patches/94a0c077bd.patch",
+    "commit_tests": [
+      "tests/factories.py"
+    ]
+  },
+  {
+    "sha": "51832d2d0cf285eb6497452bbc4800241f89df29",
+    "date": "2026-09-28",
+    "subject": "feat: expire password recovery tokens",
+    "product": [
+      "settings/common.py",
+      "taiga/users/api.py",
+      "taiga/users/migrations/0034_user_token_expires_at.py",
+      "taiga/users/models.py"
+    ],
+    "tests": [
+      "tests/integration/test_users.py",
+      "tests/integration/resources_permissions/test_users_resources.py"
+    ],
+    "changed": 31,
+    "revert_patch": "patches/51832d2d0c.patch",
+    "commit_tests": [
+      "tests/integration/resources_permissions/test_users_resources.py",
+      "tests/integration/test_users.py"
+    ]
+  },
+  {
+    "sha": "74f28077f7b23617a3287d45029d56a22c6da781",
+    "date": "2026-09-07",
+    "subject": "persist imported GitHub images and rewrite descriptions",
+    "product": [
+      "taiga/importers/github/importer.py"
+    ],
+    "tests": [
+      "tests/unit/test_importers_github.py"
+    ],
+    "changed": 115,
+    "revert_patch": "patches/74f28077f7.patch",
+    "commit_tests": [
+      "tests/unit/test_importers_github.py"
+    ]
+  }
+]

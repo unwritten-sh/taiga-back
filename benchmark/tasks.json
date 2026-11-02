@@ -1,0 +1,60 @@
+[
+  {
+    "id": "taiga-1",
+    "sha": "94a0c077bdb852077910d815b7b1962e1c8ffb90",
+    "kind": "security fix (invitation tokens)",
+    "revert_patch": "patches/94a0c077bd.patch",
+    "text": "Project invitation tokens never expire, so an old invitation link stays usable forever. Make them expire after one week, the same validity period that project transfer tokens use.\n\n- Memberships already have a `token_expires_at` field. Every place that issues an invitation token (creating a membership invitation through the API, importing a project, and any other issuer) must set the token and its expiration date together. Use one shared helper for this (for example a function in the invitations service that returns the token and its expiration date) so that they can never be issued out of sync.\n- An invitation token is valid only while `token_expires_at` is in the future. An expired token behaves like an unknown token: getting the invitation by token returns 404, and logging in or registering with an expired `invitation_token` returns 404 and does not accept the invitation. Tokens issued before this change have no expiration date and are treated as expired.\n- Resending an invitation rotates the token and refreshes its expiration date, so older links stop working.\n- The test factories for memberships must create invitations with a valid expiration date (one week from now).\n\nDone when:\n- expired and legacy invitation tokens are rejected everywhere, and resending gives a new valid token;\n- the change is covered by tests;\n- the existing test suite still passes.",
+    "tests": [
+      "tests/factories.py",
+      "tests/integration/test_memberships.py",
+      "tests/integration/test_auth.py"
+    ],
+    "commit_tests": [
+      "tests/factories.py"
+    ],
+    "product": [
+      "taiga/export_import/services/store.py",
+      "taiga/projects/api.py",
+      "taiga/projects/services/invitations.py",
+      "taiga/projects/services/members.py"
+    ]
+  },
+  {
+    "id": "taiga-2",
+    "sha": "51832d2d0cf285eb6497452bbc4800241f89df29",
+    "kind": "security fix (password recovery tokens)",
+    "revert_patch": "patches/51832d2d0c.patch",
+    "text": "Password recovery tokens never expire: a recovery link from an old email can still change the password. Make them expire.\n\n- Add a setting `PASSWORD_RECOVERY_TOKEN_LIFETIME` with a default of one hour (a `timedelta`).\n- Store the expiration date of the token on the user, in a new nullable field `token_expires_at` (with its migration).\n- When a user asks for password recovery, set a new token and `token_expires_at = now + PASSWORD_RECOVERY_TOKEN_LIFETIME` (use `django.utils.timezone.now()`). Asking again replaces both.\n- Changing the password from recovery accepts the token only if it has an expiration date in the future. An expired token, or a token without an expiration date (issued before this change), is rejected with the same 400 error as an unknown token, and nothing on the user changes. On success, clear the token and its expiration date.\n\nDone when:\n- recovery tokens expire after the configured time and legacy tokens are rejected like unknown ones;\n- the change is covered by tests;\n- the existing test suite still passes.",
+    "tests": [
+      "tests/integration/test_users.py",
+      "tests/integration/resources_permissions/test_users_resources.py"
+    ],
+    "commit_tests": [
+      "tests/integration/resources_permissions/test_users_resources.py",
+      "tests/integration/test_users.py"
+    ],
+    "product": [
+      "settings/common.py",
+      "taiga/users/api.py",
+      "taiga/users/migrations/0034_user_token_expires_at.py",
+      "taiga/users/models.py"
+    ]
+  },
+  {
+    "id": "taiga-3",
+    "sha": "74f28077f7b23617a3287d45029d56a22c6da781",
+    "kind": "feature (GitHub importer)",
+    "revert_patch": "patches/74f28077f7.patch",
+    "text": "When a project is imported from GitHub, images pasted in issue descriptions (links like `https://github.com/user-attachments/assets/<id>`) stay as links to GitHub. Those links need a GitHub login and break later. Import the images into Taiga and rewrite the descriptions to point to the local copies.\n\nIn the GitHub importer (`GithubImporter` in the GitHub importer module), add a method `_import_inline_images(self, markdown, obj, repository_full_name, created_date)` that returns the markdown with every GitHub inline image URL replaced by the URL of a Taiga attachment of `obj`. For each distinct image URL (import a URL only once, even if it appears several times):\n1. Ask GitHub to render `![image](<github url>)` with the client method `render_markdown(markdown, repository_full_name)`, and read the `src` of the first `<img>` in the HTML: that is a signed URL.\n2. Download it with the client method `download(url)`, which returns `(content, headers)`. Reject it if the Content-Type is not an image. Take the file name from the Content-Disposition header (base name only); if there is none, use `github-attachment-<id><extension from the content type>`.\n3. Create the attachment with `Attachment(owner=obj.owner, project=obj.project, content_type=ContentType.objects.get_for_model(obj), object_id=obj.id, name=<file name>, size=<length of content>, created_date=created_date, is_deprecated=False)` and save the file with `attachment.attached_file.save(...)`. `Attachment`, `ContentType` and a module `logger` must be names of the importer module.\n4. The new URL is the attachment file URL plus the refresh fragment of the attachments service (`<url>#<refresh fragment>`, for example `/media/attachments/screenshot.png#_taiga-refresh=issue:42`).\nIf any step fails for one image, keep its original link, log a warning with `logger.warning`, and go on with the next image.\n\nCall it when importing issues as user stories and as issues, after the object is created (the attachment needs the object id), and save the new description only if it changed.\n\nDone when:\n- imported user stories and issues point to local copies of their GitHub images, and a failed image keeps its link;\n- the change is covered by tests;\n- the existing test suite still passes.",
+    "tests": [
+      "tests/unit/test_importers_github.py"
+    ],
+    "commit_tests": [
+      "tests/unit/test_importers_github.py"
+    ],
+    "product": [
+      "taiga/importers/github/importer.py"
+    ]
+  }
+]

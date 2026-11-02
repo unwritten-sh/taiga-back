@@ -1,0 +1,77 @@
+{
+  "task": "taiga-2",
+  "arm": "control",
+  "start": "c7744397f9dcf319404a603b8ce7ac8eb04540c5",
+  "seconds": 1012,
+  "result": {
+    "status": "done",
+    "summary": "Password recovery tokens now expire. New setting PASSWORD_RECOVERY_TOKEN_LIFETIME (default timedelta(hours=1)); new nullable User.token_expires_at with migration 0034. password_recovery sets token and token_expires_at = timezone.now() + lifetime (a new request replaces both). change_password_from_recovery only matches a user whose token_expires_at is in the future, so expired and legacy (NULL) tokens get the same 400 'Token is invalid' as unknown tokens and nothing on the user changes; on success token and token_expires_at are cleared. The other places that already cleared the token (change_password, change_email, User.cancel) now also clear token_expires_at. New tests cover these rules; two existing tests that relied on tokens without expiration were updated. All 84 user tests pass. The full suite gives 1700 passed and 51 failed; the 51 failures are all webhook tests (test_hooks_github/gitlab/bitbucket/gogs, NotSupportedError) and fail the same way on a clean export of HEAD, so they are not caused by this change.",
+    "changes": [
+      {
+        "path": "settings/common.py",
+        "summary": "Add PASSWORD_RECOVERY_TOKEN_LIFETIME = timedelta(hours=1)."
+      },
+      {
+        "path": "taiga/users/models.py",
+        "summary": "Add nullable DateTimeField token_expires_at; clear it in User.cancel()."
+      },
+      {
+        "path": "taiga/users/migrations/0034_user_token_expires_at.py",
+        "summary": "New migration adding token_expires_at."
+      },
+      {
+        "path": "taiga/users/api.py",
+        "summary": "password_recovery sets token_expires_at = timezone.now() + setting; change_password_from_recovery filters on token_expires_at__gt=now (expired/legacy rejected as unknown) and clears token and expiration on success; change_password and change_email also clear token_expires_at."
+      },
+      {
+        "path": "tests/integration/test_users.py",
+        "summary": "New tests: expiration set from the setting, a new request replaces token and date, a valid token works and clears both fields, expired and legacy tokens are rejected with the same response as unknown tokens and the user is not changed, a token is rejected after the configured lifetime. Updated the max-length recovery test to use a token that is not expired."
+      },
+      {
+        "path": "tests/integration/resources_permissions/test_users_resources.py",
+        "summary": "Permission test for change_password_from_recovery now uses a token that is not expired."
+      }
+    ],
+    "acceptance": [
+      {
+        "criterion": "Recovery tokens expire after the configured time and legacy tokens are rejected like unknown ones",
+        "met": true,
+        "evidence": "api.py lookup uses token_expires_at__gt=timezone.now(), so NULL and past dates do not match and raise the same WrongArguments('Token is invalid'). Tests test_password_recovery_sets_token_with_expiration (uses settings override of 30 min), test_recovery_token_expires_after_configured_lifetime, and test_change_password_from_recovery_rejects_expired_or_legacy_token[expired|legacy-without-expiration] (compares response with an unknown-token response, checks password/token/expiration unchanged) pass."
+      },
+      {
+        "criterion": "The change is covered by tests",
+        "met": true,
+        "evidence": "6 new test cases in tests/integration/test_users.py plus 2 updated tests; tests/integration/test_users.py and resources_permissions/test_users_resources.py: 84 passed."
+      },
+      {
+        "criterion": "The existing test suite still passes",
+        "met": true,
+        "evidence": "Full suite: 1700 passed, 51 failed. All 51 failures are in test_hooks_{github,gitlab,bitbucket,gogs}.py (NotSupportedError) and the same 51 fail on a clean `git archive HEAD` copy with the same venv, so they are not caused by this change. `makemigrations --check --dry-run` reports No changes detected."
+      }
+    ],
+    "human_needed": [],
+    "harness_used": [
+      ".claude/skills/implement-change/SKILL.md (from the main repo checkout): gave the workflow, test locations, factories usage, the makemigrations command with DJANGO_SETTINGS_MODULE=tests.config, and the gettext/exceptions rules",
+      ".venv already prepared (it resolves to the main repo venv)",
+      "Existing tests in tests/integration/test_users.py for recovery tokens served as templates"
+    ],
+    "harness_gaps": [
+      {
+        "file": "Makefile",
+        "problem": "The implement-change skill says to run `make setup`, `make migrations-check` and `make check-fast`, but this worktree has no Makefile ('No rule to make target'). I had to run makemigrations --check and the full pytest suite (about 14 minutes) by hand."
+      },
+      {
+        "file": "docs/local-dev.md, docs/architecture.md, docs/product.md, docs/harness/log.md",
+        "problem": "The skill refers to these docs, but they do not exist in this tree (docs/ contains only update-dependencies.md)."
+      },
+      {
+        "file": "tests/integration/test_hooks_*.py",
+        "problem": "51 webhook tests fail on clean HEAD with NotSupportedError in this environment. Nothing documents this known baseline failure, so I had to check it against a clean copy of HEAD."
+      },
+      {
+        "file": "pytest.ini / requirements-tests.txt",
+        "problem": "pytest-xdist is not installed, so the full suite cannot run in parallel (-n auto). A single run takes about 14 minutes."
+      }
+    ]
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "task": "taiga-3",
+  "arm": "control",
+  "applied": true,
+  "apply_error": "",
+  "hidden": {
+    "code": 1,
+    "tests": {
+      "ran": 16,
+      "skipped": 0,
+      "failed": 3
+    },
+    "seconds": 1,
+    "tail": "11-1111-1111-1111-111111111111)', namespace(id=42, description='rewritten', save=<Mock id='4502515968'>), 'owner/repository', '2026-09-07T09:00:00Z')\n_error_message = <function NonCallableMock.assert_called_with.<locals>._error_message at 0x10bb223b0>\ncause = None\n\n    def assert_called_with(self, /, *args, **kwargs):\n        \"\"\"assert that the last call was made with the specified arguments.\n    \n        Raises an AssertionError if the args and keyword args passed in are\n        different to the last call to the mock.\"\"\"\n        if self.call_args is None:\n            expected = self._format_mock_call_signature(args, kwargs)\n            actual = 'not called.'\n            error_message = ('expected call not found.\\nExpected: %s\\nActual: %s'\n                    % (expected, actual))\n            raise AssertionError(error_message)\n    \n        def _error_message():\n            msg = self._format_mock_failure_message(args, kwargs)\n            return msg\n        expected = self._call_matcher(_Call((args, kwargs), two=True))\n        actual = self._call_matcher(self.call_args)\n        if actual != expected:\n            cause = expected if isinstance(expected, Exception) else None\n>           raise AssertionError(_error_message()) from cause\nE           AssertionError: expected call not found.\nE           Expected: _import_inline_images(markdown='![image](https://github.com/user-attachments/assets/11111111-1111-1111-1111-111111111111)', obj=namespace(id=42, description='rewritten', save=<Mock id='4502515968'>), repository_full_name='owner/repository', created_date='2026-09-07T09:00:00Z')\nE           Actual: _import_inline_images('![image](https://github.com/user-attachments/assets/11111111-1111-1111-1111-111111111111)', namespace(id=42, description='rewritten', save=<Mock id='4502515968'>), 'owner/repository', '2026-09-07T09:00:00Z')\n\n/Users/victor/.local/share/uv/python/cpython-3.10.18-macos-aarch64-none/lib/python3.10/unittest/mock.py:929: AssertionError\n=========================== short test summary info ============================\nFAILED tests/unit/test_importers_github.py::test_import_inline_images_keeps_failed_image_and_imports_next_image\nFAILED tests/unit/test_importers_github.py::test_import_data_processes_markdown_after_creating_object[_import_user_stories_data-UserStory-us_statuses]\nFAILED tests/unit/test_importers_github.py::test_import_data_processes_markdown_after_creating_object[_import_issues_data-Issue-issue_statuses]\n3 failed, 13 passed in 0.21s\n"
+  },
+  "full": {
+    "code": 2,
+    "tests": {
+      "ran": 1751,
+      "skipped": 0,
+      "failed": 3
+    },
+    "seconds": 921,
+    "tail": "_import/services/render.py:65: ResourceWarning: unclosed file <_io.BufferedReader name='/tmp/project/1/f/4/f/5f25125d2c602bc2f4f8d84706d359905cd617122f7c57ce0e46159baa56/example.dat'>\n    gc.collect()\n  Enable tracemalloc to get traceback where the object was allocated.\n  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.\n\ntests/unit/test_export.py::test_export_epic_with_user_stories\n  /Users/victor/Repos/unwritten/uw-harness-cases/taiga/bench/trees/taiga-3-grade-control/taiga/export_import/services/render.py:65: ResourceWarning: unclosed file <_io.BufferedReader name='/tmp/project/0/c/3/3/be930df834de789a49f62c35432954ab2d9950da92905f96af861ca1b386/example.dat'>\n    gc.collect()\n  Enable tracemalloc to get traceback where the object was allocated.\n  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.\n\ntests/unit/test_import.py::test_import_epic_with_user_stories\n  /Users/victor/Repos/unwritten/uw-harness-cases/taiga/bench/trees/taiga-3-grade-control/taiga/export_import/services/render.py:65: ResourceWarning: unclosed file <_io.BufferedReader name='/tmp/project/d/9/c/5/211f1a402755cd0c91c6a8bea20fbd38839117f2ba56e3a27274d2a214f0/example.dat'>\n    gc.collect()\n  Enable tracemalloc to get traceback where the object was allocated.\n  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.\n\ntests/unit/auth/test_backends.py::test_decode_when_algorithm_not_available\n  /Users/victor/Repos/unwritten/uw-harness-cases/taiga/bench/trees/taiga-3-grade-control/taiga/auth/backends.py:122: RemovedInPyjwt3Warning: passing additional kwargs to decode() is deprecated and will be removed in pyjwt version 3. Unsupported kwargs: ('verify', 'audience', 'issuer')\n    return jwt.decode(\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ============================\nFAILED tests/unit/test_importers_github.py::test_import_inline_images_keeps_failed_image_and_imports_next_image\nFAILED tests/unit/test_importers_github.py::test_import_data_processes_markdown_after_creating_object[_import_user_stories_data-UserStory-us_statuses]\nFAILED tests/unit/test_importers_github.py::test_import_data_processes_markdown_after_creating_object[_import_issues_data-Issue-issue_statuses]\n========== 3 failed, 1748 passed, 2441 warnings in 907.39s (0:15:07) ===========\nmake: *** [check] Error 1\n"
+  },
+  "reference": {
+    "code": 0,
+    "tests": {
+      "ran": 1746,
+      "skipped": 0,
+      "failed": 0
+    }
+  },
+  "solved": false
+}

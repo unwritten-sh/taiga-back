@@ -1,0 +1,522 @@
+diff --git a/taiga/export_import/services/store.py b/taiga/export_import/services/store.py
+index 6c51dcc1..2a07231f 100644
+--- a/taiga/export_import/services/store.py
++++ b/taiga/export_import/services/store.py
+@@ -9,7 +9,6 @@
+ # is not the baddest practice ;)
+ 
+ import os
+-import uuid
+ 
+ from unidecode import unidecode
+ 
+@@ -25,6 +24,7 @@ from taiga.projects.references import sequences as seq
+ from taiga.projects.references import models as refs
+ from taiga.projects.userstories.models import RolePoints
+ from taiga.projects.services import find_invited_user
++from taiga.projects.services import set_invitation_token
+ from taiga.timeline.service import build_project_namespace
+ 
+ from .. import exceptions as err
+@@ -191,7 +191,7 @@ def _store_membership(project, membership):
+     if validator.is_valid():
+         validator.object.project = project
+         validator.object._importing = True
+-        validator.object.token = str(uuid.uuid4())
++        set_invitation_token(validator.object)
+         validator.object.user = find_invited_user(validator.object.email,
+                                                   default=validator.object.user)
+         try:
+diff --git a/taiga/projects/api.py b/taiga/projects/api.py
+index 4ae62ce6..0fd8cdd9 100644
+--- a/taiga/projects/api.py
++++ b/taiga/projects/api.py
+@@ -1093,7 +1093,7 @@ class MembershipViewSet(ArchivedByProjectMixin, BlockedByProjectMixin, ModelCrud
+         self.check_permissions(request, 'resend_invitation', invitation.project)
+         self.pre_conditions_on_save(invitation)
+ 
+-        services.send_invitation(invitation=invitation)
++        services.resend_invitation(invitation=invitation)
+         return response.NoContent()
+ 
+     @list_route(methods=["POST"])
+@@ -1156,7 +1156,7 @@ class MembershipViewSet(ArchivedByProjectMixin, BlockedByProjectMixin, ModelCrud
+         obj.user = services.find_invited_user(obj.email, default=obj.user)
+ 
+         if not obj.token and not obj.user:
+-            obj.token = str(uuid.uuid4())
++            services.set_invitation_token(obj)
+ 
+         super().pre_save(obj)
+ 
+@@ -1179,5 +1179,10 @@ class InvitationViewSet(ModelListViewSet):
+     lookup_field = "token"
+     permission_classes = (AllowAnyPermission,)
+ 
++    def get_queryset(self):
++        # Expired and legacy (no expiration date) tokens behave like unknown tokens
++        qs = super().get_queryset()
++        return qs.filter(token_expires_at__gt=timezone.now())
++
+     def list(self, *args, **kwargs):
+         raise exc.PermissionDenied(_("You don't have permissions to see that."))
+diff --git a/taiga/projects/management/commands/sample_data.py b/taiga/projects/management/commands/sample_data.py
+index 66135eaf..8842ed28 100644
+--- a/taiga/projects/management/commands/sample_data.py
++++ b/taiga/projects/management/commands/sample_data.py
+@@ -35,6 +35,7 @@ from taiga.projects.attachments.models import *
+ from taiga.projects.custom_attributes.models import *
+ from taiga.projects.custom_attributes.choices import TYPES_CHOICES, TEXT_TYPE, MULTILINE_TYPE, DATE_TYPE, URL_TYPE
+ from taiga.projects.history.services import take_snapshot
++from taiga.projects.services.invitations import generate_invitation_token
+ from taiga.projects.likes.services import add_like
+ from taiga.projects.votes.services import add_vote
+ from taiga.events.apps import disconnect_events_signals
+@@ -180,11 +181,13 @@ class Command(BaseCommand):
+             for i in range(NUM_INVITATIONS):
+                 role = self.sd.db_object_from_queryset(project.roles.all())
+ 
++                token, token_expires_at = generate_invitation_token()
+                 Membership.objects.create(email=self.sd.email(),
+                                           project=project,
+                                           role=role,
+                                           is_admin=self.sd.boolean(),
+-                                          token=self.sd.hex_chars(10,10))
++                                          token=token,
++                                          token_expires_at=token_expires_at)
+ 
+                 if role.computable:
+                     computable_project_roles.add(role)
+diff --git a/taiga/projects/services/__init__.py b/taiga/projects/services/__init__.py
+index cc97e496..e2f0fa85 100644
+--- a/taiga/projects/services/__init__.py
++++ b/taiga/projects/services/__init__.py
+@@ -27,6 +27,9 @@ from .filters import get_all_tags
+ 
+ from .invitations import send_invitation
+ from .invitations import find_invited_user
++from .invitations import generate_invitation_token
++from .invitations import set_invitation_token
++from .invitations import resend_invitation
+ 
+ from .logo import get_logo_small_thumbnail_url
+ from .logo import get_logo_big_thumbnail_url
+diff --git a/taiga/projects/services/invitations.py b/taiga/projects/services/invitations.py
+index e4b63c67..c74e21de 100644
+--- a/taiga/projects/services/invitations.py
++++ b/taiga/projects/services/invitations.py
+@@ -5,11 +5,15 @@
+ #
+ # Copyright (c) 2021-present Kaleidos INC
+ 
++import datetime
++import uuid
++
+ from django.apps import apps
+ from django.conf import settings
+ from django.contrib.auth import get_user_model
+ from django.db import transaction as tx
+ from django.db import IntegrityError
++from django.utils import timezone
+ from django.utils.translation import gettext as _
+ 
+ from taiga.base import exceptions as exc
+@@ -17,6 +21,36 @@ from taiga.base import exceptions as exc
+ from taiga.base.mails import mail_builder
+ 
+ 
++# Same validity period as project transfer tokens
++INVITATION_TOKEN_LIFETIME = datetime.timedelta(days=7)
++
++
++def generate_invitation_token():
++    """
++    Return a new invitation token and its expiration date, as a tuple
++    `(token, token_expires_at)`.
++
++    Every place that issues an invitation token must use this function,
++    so the token and its expiration date are always set together.
++    """
++    return str(uuid.uuid4()), timezone.now() + INVITATION_TOKEN_LIFETIME
++
++
++def set_invitation_token(membership):
++    """Issue a new invitation token (and expiration date) on a membership. Does not save it."""
++    membership.token, membership.token_expires_at = generate_invitation_token()
++    return membership
++
++
++@tx.atomic
++def resend_invitation(invitation):
++    """Rotate the invitation token, so older links stop working, and send the email again."""
++    if not invitation.user:
++        set_invitation_token(invitation)
++        invitation.save(update_fields=["token", "token_expires_at"])
++    send_invitation(invitation)
++
++
+ def send_invitation(invitation):
+     """Send an invitation email"""
+     if invitation.user:
+@@ -56,7 +90,9 @@ def get_membership_by_token(token:str):
+     that matches with specified token.
+ 
+     Only pending invitations are matched, so already accepted tokens
+-    can not be reused to reassign the membership.
++    can not be reused to reassign the membership. Expired tokens, and
++    tokens without an expiration date (issued before tokens could
++    expire), behave like unknown tokens.
+ 
+     The row is locked to prevent two concurrent requests from
+     accepting the same invitation.
+@@ -72,6 +108,7 @@ def get_membership_by_token(token:str):
+           .filter(
+               token=token,
+               user_id__isnull=True,
++              token_expires_at__gt=timezone.now(),
+           ))
+     if len(qs) == 0:
+         raise exc.NotFound(_("Token does not match any valid invitation."))
+diff --git a/taiga/projects/services/members.py b/taiga/projects/services/members.py
+index 848052dd..c8375850 100644
+--- a/taiga/projects/services/members.py
++++ b/taiga/projects/services/members.py
+@@ -5,8 +5,6 @@
+ #
+ # Copyright (c) 2021-present Kaleidos INC
+ 
+-import uuid
+-
+ from taiga.base.exceptions import ValidationError, WrongArguments
+ from taiga.base.utils import db
+ from taiga.users.models import User
+@@ -17,6 +15,7 @@ from django.core.validators import validate_email
+ from django.utils.translation import gettext as _
+ 
+ from .. import models
++from .invitations import generate_invitation_token
+ 
+ 
+ def get_members_from_bulk(bulk_data, **additional_fields):
+@@ -45,8 +44,7 @@ def get_members_from_bulk(bulk_data, **additional_fields):
+             except ValidationError:
+                 raise WrongArguments(_("Malformed email adress."))
+ 
+-            if "token" not in data_copy.keys():
+-                data_copy["token"] = str(uuid.uuid4())
++            data_copy["token"], data_copy["token_expires_at"] = generate_invitation_token()
+ 
+         data_copy.update(additional_fields)
+ 
+diff --git a/taiga/projects/validators.py b/taiga/projects/validators.py
+index 23f3f782..cb043e0e 100644
+--- a/taiga/projects/validators.py
++++ b/taiga/projects/validators.py
+@@ -140,7 +140,9 @@ class MembershipValidator(validators.ModelValidator):
+ 
+     class Meta:
+         model = models.Membership
+-        read_only_fields = ("user", "email")
++        # Invitation tokens are only issued by the server
++        # (see services.invitations.generate_invitation_token)
++        read_only_fields = ("user", "email", "token", "token_expires_at")
+ 
+     def restore_object(self, attrs, instance=None):
+         username = attrs.pop("username", None)
+diff --git a/tests/factories.py b/tests/factories.py
+index 6159e83a..84d8c0d8 100644
+--- a/tests/factories.py
++++ b/tests/factories.py
+@@ -10,6 +10,7 @@ import threading
+ from datetime import date, timedelta
+ 
+ from django.conf import settings
++from django.utils import timezone
+ 
+ from .utils import DUMMY_BMP_DATA
+ 
+@@ -204,6 +205,7 @@ class MembershipFactory(Factory):
+         strategy = factory.CREATE_STRATEGY
+ 
+     token = factory.LazyAttribute(lambda obj: str(uuid.uuid4()))
++    token_expires_at = factory.LazyFunction(lambda: timezone.now() + timedelta(days=7))
+     project = factory.SubFactory("tests.factories.ProjectFactory")
+     role = factory.SubFactory("tests.factories.RoleFactory")
+     user = factory.SubFactory("tests.factories.UserFactory")
+@@ -215,6 +217,7 @@ class InvitationFactory(Factory):
+         strategy = factory.CREATE_STRATEGY
+ 
+     token = factory.LazyAttribute(lambda obj: str(uuid.uuid4()))
++    token_expires_at = factory.LazyFunction(lambda: timezone.now() + timedelta(days=7))
+     project = factory.SubFactory("tests.factories.ProjectFactory")
+     role = factory.SubFactory("tests.factories.RoleFactory")
+     email = factory.Sequence(lambda n: "user{}@email.com".format(n))
+diff --git a/tests/integration/test_auth.py b/tests/integration/test_auth.py
+index ce2164da..2290a735 100644
+--- a/tests/integration/test_auth.py
++++ b/tests/integration/test_auth.py
+@@ -7,7 +7,11 @@
+ 
+ import pytest
+ 
++from datetime import timedelta
++
++from django.contrib.auth import get_user_model
+ from django.urls import reverse
++from django.utils import timezone
+ from django.core import mail
+ 
+ from .. import factories
+@@ -535,3 +539,66 @@ def test_login_fail_throttling(client, settings):
+     assert response.status_code == 429, response.data
+ 
+     settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["login-fail"] = None
++
++
++@pytest.mark.parametrize("token_expires_at", [
++    timezone.now() - timedelta(seconds=1),  # expired
++    None,                                   # legacy token without expiration date
++])
++def test_login_with_expired_invitation_token_is_rejected(client, settings, token_expires_at):
++    settings.PUBLIC_REGISTER_ENABLED = False
++    user = factories.UserFactory()
++    membership = factories.MembershipFactory(user=None, token_expires_at=token_expires_at)
++
++    auth_data = {
++        "username": user.username,
++        "password": user.username,
++        "type": "normal",
++        "invitation_token": membership.token,
++    }
++    response = client.post(reverse("auth-list"), auth_data)
++    membership.refresh_from_db()
++
++    assert response.status_code == 404, response.data
++    assert membership.user is None
++
++
++def test_private_register_with_valid_invitation_token(client, settings):
++    settings.PUBLIC_REGISTER_ENABLED = False
++    membership = factories.MembershipFactory(user=None)
++
++    register_form = {"username": "invited",
++                     "password": "password",
++                     "full_name": "fname",
++                     "email": "invited@email.com",
++                     "accepted_terms": True,
++                     "type": "private",
++                     "token": membership.token}
++    response = client.post(reverse("auth-register"), register_form)
++    membership.refresh_from_db()
++
++    assert response.status_code == 201, response.data
++    assert membership.user.username == "invited"
++
++
++@pytest.mark.parametrize("token_expires_at", [
++    timezone.now() - timedelta(seconds=1),  # expired
++    None,                                   # legacy token without expiration date
++])
++def test_private_register_with_expired_invitation_token_is_rejected(client, settings, token_expires_at):
++    settings.PUBLIC_REGISTER_ENABLED = False
++    membership = factories.MembershipFactory(user=None, token_expires_at=token_expires_at)
++
++    register_form = {"username": "invited",
++                     "password": "password",
++                     "full_name": "fname",
++                     "email": "invited@email.com",
++                     "accepted_terms": True,
++                     "type": "private",
++                     "token": membership.token}
++    response = client.post(reverse("auth-register"), register_form)
++    membership.refresh_from_db()
++
++    assert response.status_code == 404, response.data
++    assert membership.user is None
++    assert not get_user_model().objects.filter(username="invited").exists()
+diff --git a/tests/integration/test_importer_api.py b/tests/integration/test_importer_api.py
+index 87739ed2..7f41d784 100644
+--- a/tests/integration/test_importer_api.py
++++ b/tests/integration/test_importer_api.py
+@@ -7,11 +7,13 @@
+ 
+ import pytest
+ import base64
++import datetime
+ import logging
+ 
+ from django.apps import apps
+ from django.urls import reverse
+ from django.core.files.base import ContentFile
++from django.utils import timezone
+ 
+ from taiga.base.utils import json
+ from taiga.export_import import services
+@@ -194,6 +196,30 @@ def test_valid_project_import_with_membership_uuid_rewrite(client):
+     assert Membership.objects.filter(email="with-uuid@email.com", token="123").count() == 0
+ 
+ 
++def test_valid_project_import_issues_invitation_tokens_with_expiration(client):
++    user = f.UserFactory.create()
++    client.login(user)
++
++    url = reverse("importer-list")
++    data = {
++        "name": "Imported project",
++        "description": "Imported project",
++        "memberships": [{
++            "email": "imported-invitation@email.com",
++            "role": "Role",
++            "token_expires_at": "2000-01-01T00:00:00Z",
++        }],
++        "roles": [{"name": "Role"}]
++    }
++
++    response = client.json.post(url, json.dumps(data))
++    assert response.status_code == 201, response.data
++    invitation = Membership.objects.get(email="imported-invitation@email.com")
++    assert invitation.token
++    delta = invitation.token_expires_at - timezone.now()
++    assert datetime.timedelta(days=7) - datetime.timedelta(minutes=5) < delta <= datetime.timedelta(days=7)
++
++
+ def test_valid_project_import_with_extra_data(client):
+     user = f.UserFactory.create()
+     client.login(user)
+diff --git a/tests/integration/test_memberships.py b/tests/integration/test_memberships.py
+index 5beb93b2..566ed22b 100644
+--- a/tests/integration/test_memberships.py
++++ b/tests/integration/test_memberships.py
+@@ -5,8 +5,11 @@
+ #
+ # Copyright (c) 2021-present Kaleidos INC
+ 
++from datetime import timedelta
+ from unittest import mock
++
+ from django.urls import reverse
++from django.utils import timezone
+ 
+ from taiga.projects import services
+ from taiga.base.utils import json
+@@ -27,6 +30,28 @@ def test_get_members_from_bulk():
+     assert members[1].email == "member2@email.com"
+ 
+ 
++def test_get_members_from_bulk_issues_invitation_tokens_with_expiration():
++    data = [{"role_id": "1", "username": "member1@email.com"}]
++    members = services.get_members_from_bulk(data, project_id=1)
++
++    assert members[0].token
++    _assert_expires_in_one_week(members[0].token_expires_at)
++
++
++def _assert_expires_in_one_week(token_expires_at):
++    assert token_expires_at is not None
++    delta = token_expires_at - timezone.now()
++    assert timedelta(days=7) - timedelta(minutes=5) < delta <= timedelta(days=7)
++
++
++def test_generate_invitation_token():
++    token, token_expires_at = services.generate_invitation_token()
++    other_token, _ = services.generate_invitation_token()
++
++    assert token and token != other_token
++    _assert_expires_in_one_week(token_expires_at)
++
++
+ def test_create_member_forbidden_for_unverified_user(client):
+     project = f.ProjectFactory()
+     john = f.UserFactory.create(verified_email=False)
+@@ -948,3 +973,91 @@ def test_api_create_bulk_members_throttling(client, settings):
+ 
+     assert response.status_code == 429
+     settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["create-memberships"] = None
++
++
++def test_api_create_invitation_sets_token_expiration(client):
++    membership = f.MembershipFactory(is_admin=True)
++    role = f.RoleFactory.create(project=membership.project)
++
++    client.login(membership.user)
++    url = reverse("memberships-list")
++    data = {"role": role.pk, "project": role.project.pk, "username": "new-invited@email.com"}
++    response = client.json.post(url, json.dumps(data))
++
++    assert response.status_code == 201, response.data
++    invitation = membership.project.memberships.get(email="new-invited@email.com")
++    assert invitation.token
++    _assert_expires_in_one_week(invitation.token_expires_at)
++
++
++def test_api_create_invitation_ignores_client_token(client):
++    membership = f.MembershipFactory(is_admin=True)
++    role = f.RoleFactory.create(project=membership.project)
++
++    client.login(membership.user)
++    url = reverse("memberships-list")
++    data = {"role": role.pk, "project": role.project.pk, "username": "new-invited@email.com",
++            "token": "chosen-by-client", "token_expires_at": "2100-01-01T00:00:00Z"}
++    response = client.json.post(url, json.dumps(data))
++
++    assert response.status_code == 201, response.data
++    invitation = membership.project.memberships.get(email="new-invited@email.com")
++    assert invitation.token != "chosen-by-client"
++    _assert_expires_in_one_week(invitation.token_expires_at)
++
++
++def test_api_create_bulk_invitations_sets_token_expiration(client):
++    membership = f.MembershipFactory(is_admin=True)
++    role = f.RoleFactory.create(project=membership.project)
++
++    client.login(membership.user)
++    url = reverse("memberships-bulk-create")
++    data = {
++        "project_id": membership.project.id,
++        "bulk_memberships": [{"role_id": role.pk, "username": "bulk-invited@email.com"}],
++    }
++    response = client.json.post(url, json.dumps(data))
++
++    assert response.status_code == 200, response.data
++    invitation = membership.project.memberships.get(email="bulk-invited@email.com")
++    assert invitation.token
++    _assert_expires_in_one_week(invitation.token_expires_at)
++
++
++def test_api_resend_invitation_rotates_token(client, outbox):
++    invitation = f.create_invitation(user=None,
++                                     token_expires_at=timezone.now() - timedelta(days=1))
++    f.MembershipFactory(project=invitation.project, user=invitation.project.owner, is_admin=True)
++    old_token = invitation.token
++    url = reverse("memberships-resend-invitation", kwargs={"pk": invitation.pk})
++
++    client.login(invitation.project.owner)
++    response = client.post(url)
++    invitation.refresh_from_db()
++
++    assert response.status_code == 204
++    assert invitation.token and invitation.token != old_token
++    _assert_expires_in_one_week(invitation.token_expires_at)
++    assert invitation.token in outbox[0].body
++
++    client.logout()
++    response = client.get(reverse("invitations-detail", kwargs={"token": old_token}))
++    assert response.status_code == 404
++    response = client.get(reverse("invitations-detail", kwargs={"token": invitation.token}))
++    assert response.status_code == 200
++
++
++def test_api_get_invitation_by_valid_token(client):
++    invitation = f.InvitationFactory()
++    response = client.get(reverse("invitations-detail", kwargs={"token": invitation.token}))
++    assert response.status_code == 200, response.data
++
++
++@pytest.mark.parametrize("token_expires_at", [
++    timezone.now() - timedelta(seconds=1),  # expired
++    None,                                   # legacy token without expiration date
++])
++def test_api_get_invitation_by_expired_token_returns_404(client, token_expires_at):
++    invitation = f.InvitationFactory(token_expires_at=token_expires_at)
++    response = client.get(reverse("invitations-detail", kwargs={"token": invitation.token}))
++    assert response.status_code == 404

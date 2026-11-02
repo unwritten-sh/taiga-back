@@ -1,0 +1,646 @@
+taiga/importers/github/importer.py  | 117 ------------------------
+ tests/unit/test_importers_github.py | 178 ------------------------------------
+ 2 files changed, 295 deletions(-)
+
+diff --git a/taiga/importers/github/importer.py b/taiga/importers/github/importer.py
+index c2a46c56..b8f92996 100644
+--- a/taiga/importers/github/importer.py
++++ b/taiga/importers/github/importer.py
+@@ -6,23 +6,15 @@
+ # Copyright (c) 2021-present Kaleidos INC
+ 
+ import datetime
+-import logging
+-import mimetypes
+-import os.path
+ import re
+ import requests
+-from email.message import Message
+-from html.parser import HTMLParser
+ from urllib.parse import parse_qsl
+-from django.contrib.contenttypes.models import ContentType
+ from django.core.files.base import ContentFile
+ 
+ from taiga.projects.models import Project, ProjectTemplate
+ from taiga.projects.references.models import recalc_reference_counter
+ from taiga.projects.userstories.models import UserStory
+ from taiga.projects.issues.models import Issue
+-from taiga.projects.attachments.models import Attachment
+-from taiga.projects.attachments.services import generate_refresh_fragment
+ from taiga.projects.milestones.models import Milestone
+ from taiga.projects.history.services import take_snapshot
+ from taiga.projects.history.services import (make_diff_from_dicts,
+@@ -40,9 +32,6 @@ from taiga.importers.exceptions import InvalidAuthResult, FailedRequest
+ from taiga.importers import services as import_service
+ 
+ 
+-logger = logging.getLogger("taiga.importers.github")
+-
+-
+ GITHUB_INLINE_IMAGE_RE = re.compile(
+     r"!\[[^\]\n]*\]\((?P<url>https://github\.com/user-attachments/assets/"
+     r"[0-9a-fA-F-]{36})\)"
+@@ -54,16 +43,6 @@ GITHUB_INLINE_IMAGE_HTML_RE = re.compile(
+ )
+ 
+ 
+-class _ImageSourceParser(HTMLParser):
+-    def __init__(self):
+-        super().__init__()
+-        self.src = None
+-
+-    def handle_starttag(self, tag, attrs):
+-        if tag == "img" and self.src is None:
+-            self.src = dict(attrs).get("src")
+-
+-
+ def extract_github_inline_image_urls(markdown):
+     urls = []
+     for pattern in (GITHUB_INLINE_IMAGE_RE, GITHUB_INLINE_IMAGE_HTML_RE):
+@@ -184,82 +163,6 @@ class GithubImporter:
+ 
+         return default
+ 
+-    def _import_inline_image_attachment(self, obj, github_url, repository_full_name, created_date):
+-        rendered = self._client.render_markdown(
+-            "![image]({})".format(github_url),
+-            repository_full_name,
+-        )
+-        parser = _ImageSourceParser()
+-        parser.feed(rendered)
+-        if not parser.src:
+-            raise ValueError("Rendered GitHub Markdown has no image source")
+-
+-        content, headers = self._client.download(parser.src)
+-        content_type = headers.get("Content-Type", "").split(";", 1)[0].lower()
+-        if not content_type.startswith("image/"):
+-            raise ValueError("GitHub attachment is not an image")
+-
+-        disposition = Message()
+-        disposition["Content-Disposition"] = headers.get("Content-Disposition", "")
+-        filename = disposition.get_filename()
+-        if filename:
+-            filename = os.path.basename(filename)
+-        if not filename:
+-            attachment_id = github_url.rsplit("/", 1)[-1]
+-            extension = mimetypes.guess_extension(content_type) or ".png"
+-            filename = "github-attachment-{}{}".format(attachment_id, extension)
+-
+-        attachment = Attachment(
+-            owner=obj.owner,
+-            project=obj.project,
+-            content_type=ContentType.objects.get_for_model(obj),
+-            object_id=obj.id,
+-            name=filename,
+-            size=len(content),
+-            created_date=created_date,
+-            is_deprecated=False,
+-        )
+-        attachment.attached_file.save(filename, ContentFile(content), save=True)
+-        return "{}#{}".format(
+-            attachment.attached_file.url,
+-            generate_refresh_fragment(attachment),
+-        )
+-
+-    def _import_inline_images(self, markdown, obj, repository_full_name, created_date):
+-        github_urls = extract_github_inline_image_urls(markdown)
+-        if not github_urls:
+-            return markdown or ""
+-
+-        imported_urls = {}
+-
+-        def replace_image(match):
+-            github_url = match.group("url")
+-            if github_url not in imported_urls:
+-                try:
+-                    imported_urls[github_url] = self._import_inline_image_attachment(
+-                        obj=obj,
+-                        github_url=github_url,
+-                        repository_full_name=repository_full_name,
+-                        created_date=created_date,
+-                    )
+-                except Exception as error:
+-                    imported_urls[github_url] = None
+-                    logger.warning(
+-                        "Unable to import GitHub attachment %s for %s %s (%s)",
+-                        github_url.rsplit("/", 1)[-1],
+-                        obj.__class__.__name__,
+-                        obj.id,
+-                        type(error).__name__,
+-                    )
+-
+-            local_url = imported_urls[github_url]
+-            if not local_url:
+-                return match.group(0)
+-            return match.group(0).replace(github_url, local_url)
+-
+-        rewritten = GITHUB_INLINE_IMAGE_RE.sub(replace_image, markdown or "")
+-        return GITHUB_INLINE_IMAGE_HTML_RE.sub(replace_image, rewritten)
+-
+     def import_project(self, project_full_name, options={"keep_external_reference": False, "template": "kanban", "type": "user_stories"}):
+         repo = self._client.get('/repos/{}'.format(project_full_name))
+         project = self._import_project_data(repo, options)
+@@ -409,16 +312,6 @@ class GithubImporter:
+                     created_date=issue['created_at'],
+                 )
+ 
+-                description = self._import_inline_images(
+-                    markdown=issue.get("body", "") or "",
+-                    obj=us,
+-                    repository_full_name=repo['full_name'],
+-                    created_date=issue['created_at'],
+-                )
+-                if description != us.description:
+-                    us.description = description
+-                    us.save(update_fields=["description"])
+-
+                 assignees = issue.get('assignees', [])
+                 if len(assignees) > 1:
+                     for assignee in assignees:
+@@ -476,16 +369,6 @@ class GithubImporter:
+                     created_date=issue['created_at'],
+                 )
+ 
+-                description = self._import_inline_images(
+-                    markdown=issue.get("body", "") or "",
+-                    obj=taiga_issue,
+-                    repository_full_name=repo['full_name'],
+-                    created_date=issue['created_at'],
+-                )
+-                if description != taiga_issue.description:
+-                    taiga_issue.description = description
+-                    taiga_issue.save(update_fields=["description"])
+-
+                 assignees = issue.get('assignees', [])
+                 if len(assignees) > 1:
+                     for assignee in assignees:
+diff --git a/tests/unit/test_importers_github.py b/tests/unit/test_importers_github.py
+index e00f9915..d8246f91 100644
+--- a/tests/unit/test_importers_github.py
++++ b/tests/unit/test_importers_github.py
+@@ -1,13 +1,11 @@
+ # -*- coding: utf-8 -*-
+ 
+ from unittest import mock
+-from types import SimpleNamespace
+ 
+ import pytest
+ 
+ from taiga.importers.github.importer import (
+     GithubClient,
+-    GithubImporter,
+     extract_github_inline_image_urls,
+ )
+ 
+@@ -94,179 +92,3 @@ def test_github_client_raises_for_unavailable_resource(method):
+                 client.render_markdown("![image](url)", "owner/repository")
+             else:
+                 client.download("https://signed.invalid/image.png?jwt=mock-token")
+-
+-
+-@pytest.mark.parametrize("obj_class", [
+-    type("UserStory", (), {}),
+-    type("Issue", (), {}),
+-])
+-@mock.patch("taiga.importers.github.importer.ContentType")
+-@mock.patch("taiga.importers.github.importer.Attachment")
+-def test_import_inline_image_rewrites_markdown_and_creates_attachment(
+-    attachment_class, content_type_class, obj_class
+-):
+-    github_url = "https://github.com/user-attachments/assets/11111111-1111-1111-1111-111111111111"
+-    signed_url = "https://signed.invalid/image.png?jwt=mock-token"
+-    markdown = (
+-        "![image]({}) <img width=\"305\" height=\"171\" alt=\"Image\" "
+-        "src=\"{}\" />"
+-    ).format(github_url, github_url)
+-    attached_file = SimpleNamespace(url="/media/attachments/screenshot.png", save=mock.Mock())
+-    attachment = SimpleNamespace(
+-        id=42,
+-        content_type=SimpleNamespace(model="issue"),
+-        attached_file=attached_file,
+-    )
+-    attachment_class.return_value = attachment
+-    content_type_class.objects.get_for_model.return_value = attachment.content_type
+-
+-    client = mock.Mock()
+-    client.render_markdown.return_value = '<p><img src="{}" alt="image"></p>'.format(signed_url)
+-    client.download.return_value = (
+-        b"png-bytes",
+-        {
+-            "Content-Type": "image/png",
+-            "Content-Disposition": "inline; filename=screenshot.png",
+-        },
+-    )
+-    importer = GithubImporter.__new__(GithubImporter)
+-    importer._client = client
+-    obj = obj_class()
+-    obj.id = 7
+-    obj.owner = SimpleNamespace(id=8)
+-    obj.project = SimpleNamespace(id=9)
+-
+-    result = importer._import_inline_images(
+-        markdown=markdown,
+-        obj=obj,
+-        repository_full_name="owner/repository",
+-        created_date="2026-09-07T10:00:00Z",
+-    )
+-
+-    expected_url = "/media/attachments/screenshot.png#_taiga-refresh=issue:42"
+-    assert result == (
+-        "![image]({0}) <img width=\"305\" height=\"171\" alt=\"Image\" "
+-        "src=\"{0}\" />"
+-    ).format(expected_url)
+-    client.render_markdown.assert_called_once_with(
+-        "![image]({})".format(github_url),
+-        "owner/repository",
+-    )
+-    client.download.assert_called_once_with(signed_url)
+-    attachment_class.assert_called_once_with(
+-        owner=obj.owner,
+-        project=obj.project,
+-        content_type=attachment.content_type,
+-        object_id=obj.id,
+-        name="screenshot.png",
+-        size=len(b"png-bytes"),
+-        created_date="2026-09-07T10:00:00Z",
+-        is_deprecated=False,
+-    )
+-    attached_file.save.assert_called_once()
+-
+-
+-@mock.patch("taiga.importers.github.importer.logger.warning")
+-def test_import_inline_images_keeps_failed_image_and_imports_next_image(warning):
+-    first_url = "https://github.com/user-attachments/assets/11111111-1111-1111-1111-111111111111"
+-    second_url = "https://github.com/user-attachments/assets/22222222-2222-2222-2222-222222222222"
+-    signed_url = "https://signed.invalid/second.png?jwt=mock-token"
+-    client = mock.Mock()
+-    client.render_markdown.side_effect = [
+-        RuntimeError("render failed"),
+-        '<img src="{}">'.format(signed_url),
+-    ]
+-    client.download.return_value = b"bytes", {"Content-Type": "image/png"}
+-
+-    attached_file = SimpleNamespace(url="/media/attachments/second.png", save=mock.Mock())
+-    attachment = SimpleNamespace(
+-        id=42,
+-        content_type=SimpleNamespace(model="issue"),
+-        attached_file=attached_file,
+-    )
+-    importer = GithubImporter.__new__(GithubImporter)
+-    importer._client = client
+-    obj = SimpleNamespace(
+-        id=7,
+-        owner=SimpleNamespace(id=8),
+-        project=SimpleNamespace(id=9),
+-    )
+-
+-    with mock.patch("taiga.importers.github.importer.ContentType") as content_type_class, \
+-            mock.patch("taiga.importers.github.importer.Attachment", return_value=attachment):
+-        content_type_class.objects.get_for_model.return_value = attachment.content_type
+-        result = importer._import_inline_images(
+-            markdown="![first]({}) ![second]({})".format(first_url, second_url),
+-            obj=obj,
+-            repository_full_name="owner/repository",
+-            created_date="2026-09-07T10:00:00Z",
+-        )
+-
+-    assert first_url in result
+-    assert "/media/attachments/second.png#_taiga-refresh=issue:42" in result
+-    assert client.render_markdown.call_count == 2
+-    warning.assert_called_once()
+-
+-
+-def _github_issue(body):
+-    return {
+-        "number": 1,
+-        "labels": [],
+-        "assignee": None,
+-        "assignees": [],
+-        "milestone": None,
+-        "html_url": "https://github.invalid/owner/repository/issues/1",
+-        "user": {"id": 10},
+-        "title": "Imported issue",
+-        "body": body,
+-        "state": "open",
+-        "updated_at": "2026-09-07T10:00:00Z",
+-        "created_at": "2026-09-07T09:00:00Z",
+-    }
+-
+-
+-@pytest.mark.parametrize("method_name, model_name, status_name", [
+-    ("_import_user_stories_data", "UserStory", "us_statuses"),
+-    ("_import_issues_data", "Issue", "issue_statuses"),
+-])
+-def test_import_data_processes_markdown_after_creating_object(
+-    method_name, model_name, status_name
+-):
+-    body = "![image](https://github.com/user-attachments/assets/11111111-1111-1111-1111-111111111111)"
+-    issue = _github_issue(body)
+-    imported_object = SimpleNamespace(id=42, description=body, save=mock.Mock())
+-    model = mock.Mock()
+-    model.objects.create.return_value = imported_object
+-    model.objects.filter.return_value = mock.Mock()
+-    project = SimpleNamespace(
+-        us_statuses=mock.Mock(),
+-        issue_statuses=mock.Mock(),
+-        milestones=mock.Mock(),
+-    )
+-    getattr(project, status_name).get.return_value = SimpleNamespace()
+-
+-    client = mock.Mock()
+-    client.get.side_effect = [[issue], []]
+-    importer = GithubImporter.__new__(GithubImporter)
+-    importer._client = client
+-    importer._user = SimpleNamespace(id=99)
+-
+-    with mock.patch("taiga.importers.github.importer.{}".format(model_name), model), \
+-            mock.patch("taiga.importers.github.importer.take_snapshot") as take_snapshot, \
+-            mock.patch.object(importer, "_import_inline_images", return_value="rewritten") as import_images:
+-        if model_name == "UserStory":
+-            importer._import_user_stories_data(project, {"full_name": "owner/repository"}, {})
+-        else:
+-            importer._import_issues_data(project, {"full_name": "owner/repository"}, {})
+-
+-    model.objects.create.assert_called_once()
+-    assert model.objects.create.call_args.kwargs["description"] == body
+-    import_images.assert_called_once_with(
+-        markdown=body,
+-        obj=imported_object,
+-        repository_full_name="owner/repository",
+-        created_date="2026-09-07T09:00:00Z",
+-    )
+-    assert imported_object.description == "rewritten"
+-    imported_object.save.assert_called_once_with(update_fields=["description"])
+-    take_snapshot.assert_called_once_with(imported_object, comment="", user=None, delete=False)
+
+--- Changes ---
+
+taiga/importers/github/importer.py
+  @@ -6,23 +6,15 @@
+  -import logging
+  -import mimetypes
+  -import os.path
+   import re
+   import requests
+  -from email.message import Message
+  -from html.parser import HTMLParser
+   from urllib.parse import parse_qsl
+  -from django.contrib.contenttypes.models import ContentType
+   from django.core.files.base import ContentFile
+   
+   from taiga.projects.models import Project, ProjectTemplate
+   from taiga.projects.references.models import recalc_reference_counter
+   from taiga.projects.userstories.models import UserStory
+   from taiga.projects.issues.models import Issue
+  -from taiga.projects.attachments.models import Attachment
+  -from taiga.projects.attachments.services import generate_refresh_fragment
+   from taiga.projects.milestones.models import Milestone
+   from taiga.projects.history.services import take_snapshot
+   from taiga.projects.history.services import (make_diff_from_dicts,
+  @@ -40,9 +32,6 @@ from taiga.importers.exceptions import InvalidAuthResult, FailedRequest
+  -logger = logging.getLogger("taiga.importers.github")
+  -
+  -
+   GITHUB_INLINE_IMAGE_RE = re.compile(
+       r"!\[[^\]\n]*\]\((?P<url>https://github\.com/user-attachments/assets/"
+       r"[0-9a-fA-F-]{36})\)"
+  @@ -54,16 +43,6 @@ GITHUB_INLINE_IMAGE_HTML_RE = re.compile(
+  -class _ImageSourceParser(HTMLParser):
+  -    def __init__(self):
+  -        super().__init__()
+  -        self.src = None
+  -
+  -    def handle_starttag(self, tag, attrs):
+  -        if tag == "img" and self.src is None:
+  -            self.src = dict(attrs).get("src")
+  -
+  -
+   def extract_github_inline_image_urls(markdown):
+       urls = []
+       for pattern in (GITHUB_INLINE_IMAGE_RE, GITHUB_INLINE_IMAGE_HTML_RE):
+  @@ -184,82 +163,6 @@ class GithubImporter:
+  -    def _import_inline_image_attachment(self, obj, github_url, repository_full_name, created_date):
+  -        rendered = self._client.render_markdown(
+  -            "![image]({})".format(github_url),
+  -            repository_full_name,
+  -        )
+  -        parser = _ImageSourceParser()
+  -        parser.feed(rendered)
+  -        if not parser.src:
+  -            raise ValueError("Rendered GitHub Markdown has no image source")
+  -
+  -        content, headers = self._client.download(parser.src)
+  -        content_type = headers.get("Content-Type", "").split(";", 1)[0].lower()
+  -        if not content_type.startswith("image/"):
+  -            raise ValueError("GitHub attachment is not an image")
+  -
+  -        disposition = Message()
+  -        disposition["Content-Disposition"] = headers.get("Content-Disposition", "")
+  -        filename = disposition.get_filename()
+  -        if filename:
+  -            filename = os.path.basename(filename)
+  -        if not filename:
+  -            attachment_id = github_url.rsplit("/", 1)[-1]
+  -            extension = mimetypes.guess_extension(content_type) or ".png"
+  -            filename = "github-attachment-{}{}".format(attachment_id, extension)
+  -
+  -        attachment = Attachment(
+  -            owner=obj.owner,
+  -            project=obj.project,
+  -            content_type=ContentType.objects.get_for_model(obj),
+  -            object_id=obj.id,
+  -            name=filename,
+  -            size=len(content),
+  -            created_date=created_date,
+  -            is_deprecated=False,
+  -        )
+  -        attachment.attached_file.save(filename, ContentFile(content), save=True)
+  -        return "{}#{}".format(
+  -            attachment.attached_file.url,
+  -            generate_refresh_fragment(attachment),
+  -        )
+  -
+  -    def _import_inline_images(self, markdown, obj, repository_full_name, created_date):
+  -        github_urls = extract_github_inline_image_urls(markdown)
+  -        if not github_urls:
+  -            return markdown or ""
+  -
+  -        imported_urls = {}
+  -
+  -        def replace_image(match):
+  -            github_url = match.group("url")
+  -            if github_url not in imported_urls:
+  -                try:
+  -                    imported_urls[github_url] = self._import_inline_image_attachment(
+  -                        obj=obj,
+  -                        github_url=github_url,
+  -                        repository_full_name=repository_full_name,
+  -                        created_date=created_date,
+  -                    )
+  -                except Exception as error:
+  -                    imported_urls[github_url] = None
+  -                    logger.warning(
+  -                        "Unable to import GitHub attachment %s for %s %s (%s)",
+  -                        github_url.rsplit("/", 1)[-1],
+  -                        obj.__class__.__name__,
+  -                        obj.id,
+  -                        type(error).__name__,
+  -                    )
+  -
+  -            local_url = imported_urls[github_url]
+  -            if not local_url:
+  -                return match.group(0)
+  -            return match.group(0).replace(github_url, local_url)
+  -
+  -        rewritten = GITHUB_INLINE_IMAGE_RE.sub(replace_image, markdown or "")
+  -        return GITHUB_INLINE_IMAGE_HTML_RE.sub(replace_image, rewritten)
+  -
+       def import_project(self, project_full_name, options={"keep_external_reference": False, "template": "kanban", "type": "user_stories"}):
+           repo = self._client.get('/repos/{}'.format(project_full_name))
+           project = self._import_project_data(repo, options)
+  @@ -409,16 +312,6 @@ class GithubImporter:
+  -                description = self._import_inline_images(
+  -                    markdown=issue.get("body", "") or "",
+  -                    obj=us,
+  -                    repository_full_name=repo['full_name'],
+  -                    created_date=issue['created_at'],
+  -                )
+  -                if description != us.description:
+  -                    us.description = description
+  -                    us.save(update_fields=["description"])
+  -
+                   assignees = issue.get('assignees', [])
+                   if len(assignees) > 1:
+                       for assignee in assignees:
+  @@ -476,16 +369,6 @@ class GithubImporter:
+  -                description = self._import_inline_images(
+  -                    markdown=issue.get("body", "") or "",
+  -                    obj=taiga_issue,
+  -                    repository_full_name=repo['full_name'],
+  -                    created_date=issue['created_at'],
+  -                )
+  -                if description != taiga_issue.description:
+  -                    taiga_issue.description = description
+  -                    taiga_issue.save(update_fields=["description"])
+  -
+                   assignees = issue.get('assignees', [])
+                   if len(assignees) > 1:
+                       for assignee in assignees:
+  +0 -117
+
+tests/unit/test_importers_github.py
+  @@ -1,13 +1,11 @@
+  -from types import SimpleNamespace
+   
+   import pytest
+   
+   from taiga.importers.github.importer import (
+       GithubClient,
+  -    GithubImporter,
+       extract_github_inline_image_urls,
+   )
+   
+  @@ -94,179 +92,3 @@ def test_github_client_raises_for_unavailable_resource(method):
+  -
+  -
+  -@pytest.mark.parametrize("obj_class", [
+  -    type("UserStory", (), {}),
+  -    type("Issue", (), {}),
+  -])
+  -@mock.patch("taiga.importers.github.importer.ContentType")
+  -@mock.patch("taiga.importers.github.importer.Attachment")
+  -def test_import_inline_image_rewrites_markdown_and_creates_attachment(
+  -    attachment_class, content_type_class, obj_class
+  -):
+  -    github_url = "https://github.com/user-attachments/assets/11111111-1111-1111-1111-111111111111"
+  -    signed_url = "https://signed.invalid/image.png?jwt=mock-token"
+  -    markdown = (
+  -        "![image]({}) <img width=\"305\" height=\"171\" alt=\"Image\" "
+  -        "src=\"{}\" />"
+  -    ).format(github_url, github_url)
+  -    attached_file = SimpleNamespace(url="/media/attachments/screenshot.png", save=mock.Mock())
+  -    attachment = SimpleNamespace(
+  -        id=42,
+  -        content_type=SimpleNamespace(model="issue"),
+  -        attached_file=attached_file,
+  -    )
+  -    attachment_class.return_value = attachment
+  -    content_type_class.objects.get_for_model.return_value = attachment.content_type
+  -
+  -    client = mock.Mock()
+  -    client.render_markdown.return_value = '<p><img src="{}" alt="image"></p>'.format(signed_url)
+  -    client.download.return_value = (
+  -        b"png-bytes",
+  -        {
+  -            "Content-Type": "image/png",
+  -            "Content-Disposition": "inline; filename=screenshot.png",
+  -        },
+  -    )
+  -    importer = GithubImporter.__new__(GithubImporter)
+  -    importer._client = client
+  -    obj = obj_class()
+  -    obj.id = 7
+  -    obj.owner = SimpleNamespace(id=8)
+  -    obj.project = SimpleNamespace(id=9)
+  -
+  -    result = importer._import_inline_images(
+  -        markdown=markdown,
+  -        obj=obj,
+  -        repository_full_name="owner/repository",
+  -        created_date="2026-09-07T10:00:00Z",
+  -    )
+  -
+  -    expected_url = "/media/attachments/screenshot.png#_taiga-refresh=issue:42"
+  -    assert result == (
+  -        "![image]({0}) <img width=\"305\" height=\"171\" alt=\"Image\" "
+  -        "src=\"{0}\" />"
+  -    ).format(expected_url)
+  -    client.render_markdown.assert_called_once_with(
+  -        "![image]({})".format(github_url),
+  -        "owner/repository",
+  -    )
+  -    client.download.assert_called_once_with(signed_url)
+  -    attachment_class.assert_called_once_with(
+  -        owner=obj.owner,
+  -        project=obj.project,
+  -        content_type=attachment.content_type,
+  -        object_id=obj.id,
+  -        name="screenshot.png",
+  -        size=len(b"png-bytes"),
+  -        created_date="2026-09-07T10:00:00Z",
+  -        is_deprecated=False,
+  -    )
+  -    attached_file.save.assert_called_once()
+  -
+  -
+  -@mock.patch("taiga.importers.github.importer.logger.warning")
+  -def test_import_inline_images_keeps_failed_image_and_imports_next_image(warning):
+  -    first_url = "https://github.com/user-attachments/assets/11111111-1111-1111-1111-111111111111"
+  -    second_url = "https://github.com/user-attachments/assets/22222222-2222-2222-2222-222222222222"
+  -    signed_url = "https://signed.invalid/second.png?jwt=mock-token"
+  -    client = mock.Mock()
+  -    client.render_markdown.side_effect = [
+  -        RuntimeError("render failed"),
+  -        '<img src="{}">'.format(signed_url),
+  -    ]
+  -    client.download.return_value = b"bytes", {"Content-Type": "image/png"}
+  -
+  -    attached_file = SimpleNamespace(url="/media/attachments/second.png", save=mock.Mock())
+  -    attachment = SimpleNamespace(
+  -        id=42,
+  -        content_type=SimpleNamespace(model="issue"),
+  -        attached_file=attached_file,
+  -    )
+  -    importer = GithubImporter.__new__(GithubImporter)
+  -    importer._client = client
+  -    obj = SimpleNamespace(
+  -        id=7,
+  -        owner=SimpleNamespace(id=8),
+  -        project=SimpleNamespace(id=9),
+  -    )
+  -
+  -    with mock.patch("taiga.importers.github.importer.ContentType") as content_type_class, \
+  -            mock.patch("taiga.importers.github.importer.Attachment", return_value=attachment):
+  ... (76 lines truncated)
+  +0 -178
+[full diff: rtk git diff --no-compact]

@@ -1,0 +1,8 @@
+{
+  "arm": "harness",
+  "seconds": 1876,
+  "result": {
+    "status": "error",
+    "error": "claude did not return a valid answer (success): The full test suite finished and passed: **1751 passed, 0 failed, 0 skipped** in about 16 minutes (963.87 s). - To run it again, use `.venv/bin/pytest --create-db` from the repo root. - It uses the Homebrew PostgreSQL 14 that already listens on port 5432. I added a `taiga` user and a `taiga` databa…"
+  }
+}

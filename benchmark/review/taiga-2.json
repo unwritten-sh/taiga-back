@@ -1,0 +1,23 @@
+{
+  "task": "taiga-2",
+  "A": "harness",
+  "B": "control",
+  "answer": {
+    "A": {
+      "scope": 5,
+      "conventions": 4,
+      "tests": 4,
+      "readability": 4,
+      "notes": "Implements every requirement: the setting, the nullable field with its migration, setting the token and expiry on recovery, filtering on token_expires_at__gt=now, and clearing both fields on success, on password change, on email change and on cancel. The tests cover the expiry being set from the configured lifetime, a second request replacing the token, a valid token, an expired token found by patching now() after the real flow, and expired or legacy tokens rejected with the same response as an unknown token while the user stays unchanged. The parametrize with lambdas is a bit indirect. There is no test that a token from the real flow succeeds, and none that checks the 1-hour default."
+    },
+    "B": {
+      "scope": 4,
+      "conventions": 5,
+      "tests": 5,
+      "readability": 5,
+      "notes": "The production code is essentially the same as A's. It also adds token_expires_at to the Django admin fieldset. That is small and sensible, but the task did not ask for it. The tests go further than A's: they check the 1-hour default, that the token appears in the email body, that a full recovery flow succeeds, and that the token expires after a custom lifetime. Expired and legacy tokens are tested in two clearly named tests that share a helper. The tests are written in a clear multi-line style that is easy to read and change."
+    },
+    "merge_first": "B",
+    "why": "The two implementations are nearly identical and both correct. B's tests are more complete: they check the 1-hour default, include a successful end-to-end flow, and give expired and legacy tokens separate, clearly named tests. Its one extra change, the admin field, is harmless."
+  }
+}

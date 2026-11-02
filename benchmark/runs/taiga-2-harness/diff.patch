@@ -1,0 +1,310 @@
+diff --git a/docs/harness/log.md b/docs/harness/log.md
+index 80665d66..4319c8c3 100644
+--- a/docs/harness/log.md
++++ b/docs/harness/log.md
+@@ -15,6 +15,12 @@ One entry per significant change: date, what changed, what was learned, what is
+ - **Dev dependency added.** `flake8` in `requirements-devel.in`; `requirements-devel.txt` regenerated with `pip-compile` without `--upgrade` (only additions: flake8, mccabe, pycodestyle, pyflakes).
+ - **Secret in tracked code, not changed.** `settings/common.py:249` holds a hard-coded `SECRET_KEY`. See the TODO in `AGENTS.md` and the `blocked` list of the harness build.
+ 
++## 2026-11-02: password recovery tokens expire
++
++- **What changed.** New setting `PASSWORD_RECOVERY_TOKEN_LIFETIME` (default `timedelta(hours=1)`) in `settings/common.py`. New nullable field `User.token_expires_at` (migration `users/0034_user_token_expires_at`). `password_recovery` sets a new token and `token_expires_at = timezone.now() + lifetime`. `change_password_from_recovery` accepts the token only if `token_expires_at` is in the future; expired tokens and legacy tokens without an expiration date get the same 400 "Token is invalid" as an unknown token, and the user does not change. On success, `change_password`, `change_email` and `User.cancel()` clear both the token and its expiration date.
++- **What we learned.** Tests that create a recovery token by hand (`tests/integration/test_users.py`, `tests/integration/resources_permissions/test_users_resources.py`) must now also set `token_expires_at` in the future. `make test` calls `make db-up`, which fails when another worktree's compose PostgreSQL already holds port 5432. The tests still work against that container, but its `test_taiga` database may be used by another session at the same time. To avoid this, the full suite was run with a settings module that sets a different test database name.
++- **What is left.** Existing tokens in real databases have no expiration date, so they stop working after the migration. Users must request a new recovery email. `docker/config.py` does not expose the new setting as an environment variable.
++
+ ## 2026-11-01: fast gate output shows the test run
+ 
+ - **What changed.** `make test-unit` (used by `make check-fast`) ran `pytest tests/unit --reuse-db -q`. The `-q` flag hides the pytest header ("test session starts", "collected N items") and the file names, so the harness verifier reported that the fast gate ran no tests, although 238 tests passed. The target now runs `pytest tests/unit --reuse-db -rA --tb=short`: the output shows the header, one line per test file, one `PASSED <test id>` line per test and the final summary (`238 passed`). No test or check was removed.
+diff --git a/settings/common.py b/settings/common.py
+index 8c5f98e4..dc2b9680 100644
+--- a/settings/common.py
++++ b/settings/common.py
+@@ -453,6 +453,9 @@ SIMPLE_JWT = {
+     'CANCEL_TOKEN_LIFETIME': timedelta(days=100),
+ }
+ 
++# Time a password recovery token (sent by email) stays valid
++PASSWORD_RECOVERY_TOKEN_LIFETIME = timedelta(hours=1)
++
+ FLUSH_REFRESHED_TOKENS_PERIODICITY = 3 * 24 * 3600 # seconds
+ 
+ FORMAT_MODULE_PATH = "taiga.base.formats"
+diff --git a/taiga/users/api.py b/taiga/users/api.py
+index 7ea6ffbd..b764b0b4 100644
+--- a/taiga/users/api.py
++++ b/taiga/users/api.py
+@@ -12,6 +12,7 @@ from django.utils.translation import gettext as _
+ from django.core.validators import validate_email
+ from django.core.exceptions import ValidationError
+ from django.conf import settings
++from django.utils import timezone
+ 
+ from taiga.auth.exceptions import TokenError
+ from taiga.auth.tokens import CancelToken
+@@ -174,7 +175,8 @@ class UsersViewSet(ModelCrudViewSet):
+             return response.Ok({"detail": success_message})
+ 
+         user.token = str(uuid.uuid4())
+-        user.save(update_fields=["token"])
++        user.token_expires_at = timezone.now() + settings.PASSWORD_RECOVERY_TOKEN_LIFETIME
++        user.save(update_fields=["token", "token_expires_at"])
+ 
+         email = mail_builder.password_recovery(user, {"user": user})
+         email.send()
+@@ -194,13 +196,17 @@ class UsersViewSet(ModelCrudViewSet):
+             return response.BadRequest(validator.errors)
+ 
+         try:
+-            user = models.User.objects.get(token=validator.data["token"])
++            # Tokens without an expiration date (issued before expiration existed)
++            # or already expired are treated as unknown tokens.
++            user = models.User.objects.get(token=validator.data["token"],
++                                           token_expires_at__gt=timezone.now())
+         except models.User.DoesNotExist:
+             raise exc.WrongArguments(_("Token is invalid"))
+ 
+         user.set_password(validator.data["password"])
+         user.token = None
+-        user.save(update_fields=["password", "token"])
++        user.token_expires_at = None
++        user.save(update_fields=["password", "token", "token_expires_at"])
+ 
+         return response.NoContent()
+ 
+@@ -233,7 +239,8 @@ class UsersViewSet(ModelCrudViewSet):
+ 
+         request.user.set_password(password)
+         request.user.token = None
+-        request.user.save(update_fields=["password", "token"])
++        request.user.token_expires_at = None
++        request.user.save(update_fields=["password", "token", "token_expires_at"])
+         return response.NoContent()
+ 
+     @list_route(methods=["POST"])
+@@ -294,8 +301,10 @@ class UsersViewSet(ModelCrudViewSet):
+         user.new_email = None
+         user.email_token = None
+         user.token = None
++        user.token_expires_at = None
+         user.verified_email = True
+-        user.save(update_fields=["email", "new_email", "email_token", "token", "verified_email"])
++        user.save(update_fields=["email", "new_email", "email_token", "token", "token_expires_at",
++                                 "verified_email"])
+ 
+         user_change_email_signal.send(sender=user.__class__,
+                                       user=user,
+diff --git a/taiga/users/migrations/0034_user_token_expires_at.py b/taiga/users/migrations/0034_user_token_expires_at.py
+new file mode 100644
+index 00000000..a54d4487
+--- /dev/null
++++ b/taiga/users/migrations/0034_user_token_expires_at.py
+@@ -0,0 +1,18 @@
++# Generated by Django 3.2.25 on 2026-11-02 00:25
++
++from django.db import migrations, models
++
++
++class Migration(migrations.Migration):
++
++    dependencies = [
++        ('users', '0033_auto_20211110_1526'),
++    ]
++
++    operations = [
++        migrations.AddField(
++            model_name='user',
++            name='token_expires_at',
++            field=models.DateTimeField(blank=True, default=None, null=True, verbose_name='token expiration date'),
++        ),
++    ]
+diff --git a/taiga/users/models.py b/taiga/users/models.py
+index eb417172..c54b3831 100644
+--- a/taiga/users/models.py
++++ b/taiga/users/models.py
+@@ -152,6 +152,8 @@ class User(AbstractBaseUser, PermissionsMixin):
+                                         verbose_name=_("colorize tags"))
+     token = models.CharField(max_length=200, null=True, blank=True, default=None,
+                              verbose_name=_("token"))
++    token_expires_at = models.DateTimeField(null=True, blank=True, default=None,
++                                            verbose_name=_("token expiration date"))
+ 
+     email_token = models.CharField(max_length=200, null=True, blank=True, default=None,
+                          verbose_name=_("email token"))
+@@ -281,6 +283,7 @@ class User(AbstractBaseUser, PermissionsMixin):
+             self.timezone = ""
+             self.colorize_tags = True
+             self.token = None
++            self.token_expires_at = None
+             self.set_unusable_password()
+             self.photo = None
+             self.date_cancelled = timezone.now()
+diff --git a/tests/integration/resources_permissions/test_users_resources.py b/tests/integration/resources_permissions/test_users_resources.py
+index 63507ec0..c15c2704 100644
+--- a/tests/integration/resources_permissions/test_users_resources.py
++++ b/tests/integration/resources_permissions/test_users_resources.py
+@@ -5,9 +5,11 @@
+ #
+ # Copyright (c) 2021-present Kaleidos INC
+ 
++from datetime import timedelta
+ from tempfile import NamedTemporaryFile
+ 
+ from django.urls import reverse
++from django.utils import timezone
+ 
+ from taiga.base.utils import json
+ from taiga.users.serializers import UserAdminSerializer
+@@ -241,10 +243,11 @@ def test_user_action_remove_avatar(client, data):
+ def test_user_action_change_password_from_recovery(client, data):
+     url = reverse('users-change-password-from-recovery')
+ 
+-    new_user = f.UserFactory(token="test-token")
++    new_user = f.UserFactory(token="test-token", token_expires_at=timezone.now() + timedelta(hours=1))
+ 
+     def reset_token():
+         new_user.token = "test-token"
++        new_user.token_expires_at = timezone.now() + timedelta(hours=1)
+         new_user.save()
+ 
+     users = [
+diff --git a/tests/integration/test_users.py b/tests/integration/test_users.py
+index 4fdb8501..363ea62d 100644
+--- a/tests/integration/test_users.py
++++ b/tests/integration/test_users.py
+@@ -7,12 +7,14 @@
+ 
+ import pytest
+ import datetime
++from unittest import mock
+ from tempfile import NamedTemporaryFile
+ 
+ from django.conf import settings
+ from django.contrib.contenttypes.models import ContentType
+ from django.core import mail
+ from django.urls import reverse
++from django.utils import timezone
+ from django.core.files import File
+ from django.core.cache import cache as default_cache
+ 
+@@ -241,7 +243,8 @@ def test_change_password_max_length(client, password_length, status_code):
+ 
+ @pytest.mark.parametrize(("password_length", "status_code"), [(128, 204), (129, 400)])
+ def test_recovery_password_max_length(client, password_length, status_code):
+-    user = f.UserFactory.create(token="recovery-token")
++    user = f.UserFactory.create(token="recovery-token",
++                                token_expires_at=timezone.now() + datetime.timedelta(hours=1))
+     user.set_password("current-password")
+     user.save()
+ 
+@@ -256,6 +259,111 @@ def test_recovery_password_max_length(client, password_length, status_code):
+     assert user.check_password("p" * password_length if status_code == 204 else "current-password")
+ 
+ 
++def test_password_recovery_sets_token_with_expiration(client, settings):
++    settings.PASSWORD_RECOVERY_TOKEN_LIFETIME = datetime.timedelta(minutes=30)
++    user = f.UserFactory.create(username="recovery-user")
++
++    before = timezone.now()
++    response = client.post(reverse("users-password-recovery"), json.dumps({"username": "recovery-user"}),
++                           content_type="application/json")
++    after = timezone.now()
++
++    assert response.status_code == 200
++    user.refresh_from_db()
++    assert user.token is not None
++    assert before + datetime.timedelta(minutes=30) <= user.token_expires_at <= after + datetime.timedelta(minutes=30)
++    assert len(mail.outbox) == 1
++
++
++def test_password_recovery_again_replaces_token_and_expiration(client):
++    old_expiration = timezone.now() + datetime.timedelta(minutes=5)
++    user = f.UserFactory.create(username="recovery-user", token="old-token", token_expires_at=old_expiration)
++
++    response = client.post(reverse("users-password-recovery"), json.dumps({"username": "recovery-user"}),
++                           content_type="application/json")
++
++    assert response.status_code == 200
++    user.refresh_from_db()
++    assert user.token not in (None, "old-token")
++    assert user.token_expires_at > old_expiration
++
++    response = client.post(reverse("users-change-password-from-recovery"),
++                           json.dumps({"token": "old-token", "password": "new-password"}),
++                           content_type="application/json")
++    assert response.status_code == 400
++
++
++def test_change_password_from_recovery_with_valid_token(client):
++    user = f.UserFactory.create(token="recovery-token",
++                                token_expires_at=timezone.now() + datetime.timedelta(minutes=10))
++    user.set_password("current-password")
++    user.save()
++
++    response = client.post(reverse("users-change-password-from-recovery"),
++                           json.dumps({"token": "recovery-token", "password": "new-password"}),
++                           content_type="application/json")
++
++    assert response.status_code == 204
++    user.refresh_from_db()
++    assert user.check_password("new-password")
++    assert user.token is None
++    assert user.token_expires_at is None
++
++
++def test_change_password_from_recovery_full_flow_and_expiration(client, settings):
++    settings.PASSWORD_RECOVERY_TOKEN_LIFETIME = datetime.timedelta(hours=1)
++    user = f.UserFactory.create(username="recovery-user")
++    user.set_password("current-password")
++    user.save()
++
++    client.post(reverse("users-password-recovery"), json.dumps({"username": "recovery-user"}),
++                content_type="application/json")
++    user.refresh_from_db()
++    token = user.token
++
++    # Simulate that more than the configured lifetime has passed
++    later = timezone.now() + datetime.timedelta(hours=1, seconds=1)
++    with mock.patch("taiga.users.api.timezone.now", return_value=later):
++        response = client.post(reverse("users-change-password-from-recovery"),
++                               json.dumps({"token": token, "password": "new-password"}),
++                               content_type="application/json")
++
++    assert response.status_code == 400
++    user.refresh_from_db()
++    assert user.check_password("current-password")
++    assert user.token == token
++
++
++def _unknown_token_response(client):
++    return client.post(reverse("users-change-password-from-recovery"),
++                       json.dumps({"token": "unknown-token", "password": "new-password"}),
++                       content_type="application/json")
++
++
++@pytest.mark.parametrize("token_expires_at", [
++    pytest.param(lambda: timezone.now() - datetime.timedelta(seconds=1), id="expired"),
++    pytest.param(lambda: None, id="legacy-without-expiration"),
++])
++def test_change_password_from_recovery_rejects_expired_or_legacy_token(client, token_expires_at):
++    expires_at = token_expires_at()
++    user = f.UserFactory.create(token="recovery-token", token_expires_at=expires_at)
++    user.set_password("current-password")
++    user.save()
++
++    response = client.post(reverse("users-change-password-from-recovery"),
++                           json.dumps({"token": "recovery-token", "password": "new-password"}),
++                           content_type="application/json")
++    unknown_response = _unknown_token_response(client)
++
++    assert response.status_code == 400
++    assert response.status_code == unknown_response.status_code
++    assert response.data == unknown_response.data
++    user.refresh_from_db()
++    assert user.check_password("current-password")
++    assert user.token == "recovery-token"
++    assert user.token_expires_at == expires_at
++
++
+ def test_password_recovery_returns_200_for_unknown_username(client):
+     response = client.post(
+         reverse("users-password-recovery"),

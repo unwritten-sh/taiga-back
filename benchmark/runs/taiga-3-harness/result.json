@@ -1,0 +1,73 @@
+{
+  "task": "taiga-3",
+  "arm": "harness",
+  "start": "33adb87e3024f11a3bfeada36a1390109149aed1",
+  "seconds": 1129,
+  "result": {
+    "status": "done",
+    "summary": "I added `GithubImporter._import_inline_images(markdown, obj, repository_full_name, created_date)` in `taiga/importers/github/importer.py`. For each distinct GitHub inline image URL, it renders `![image](<url>)` with `render_markdown` and reads the src of the first `<img>`. It downloads that signed URL with `download`, rejects content that is not an image, and takes the file name from the Content-Disposition base name, or uses `github-attachment-<id><ext>` when there is none. It then creates the `Attachment` as specified, saves the file and returns `<file url>#<refresh fragment>`. If one image fails, its link stays, `logger.warning` is called, and the next image is processed. The user story and issue imports call it after the object is created and save the description only if it changed. Results: 7 new integration tests pass, `make check-fast` passes (233), and the full suite passes (1753 passed). I ran the full suite with pytest and a separate test database, because `make test` failed in `db-up`: port 5432 is used by another worktree's Postgres. Nothing was committed.",
+    "changes": [
+      {
+        "path": "taiga/importers/github/importer.py",
+        "summary": "Module logger and imports for Attachment and ContentType. Helpers for URL replacement, reading the img src, header lookup and Content-Disposition file names. New methods `_import_inline_images`, `_import_inline_image` and `_import_description_inline_images`, called in both import loops."
+      },
+      {
+        "path": "tests/integration/test_importers_github_inline_images.py",
+        "summary": "7 tests: URL rewrite, URL imported once, attachment fields, fallback file name, failures keep the link and log a warning, and an end-to-end import as user stories and as issues."
+      },
+      {
+        "path": "docs/harness/log.md",
+        "summary": "New 2026-11-02 entry for this change."
+      }
+    ],
+    "acceptance": [
+      {
+        "criterion": "Imported user stories and issues point to local copies of their GitHub images, and a failed image keeps its link",
+        "met": true,
+        "evidence": "test_import_rewrites_description_with_local_images[user_stories|issues] and test_import_inline_images_keeps_link_of_failed_images pass."
+      },
+      {
+        "criterion": "The change is covered by tests",
+        "met": true,
+        "evidence": "tests/integration/test_importers_github_inline_images.py: 7 tests pass."
+      },
+      {
+        "criterion": "The existing test suite still passes",
+        "met": true,
+        "evidence": "Full suite: 1753 passed in 829 s. make check-fast: 233 passed."
+      }
+    ],
+    "human_needed": [
+      {
+        "question": "Should images in imported GitHub comments also be copied into Taiga?",
+        "why": "Only descriptions were in scope. Comment image links will still break."
+      },
+      {
+        "question": "Should each worktree's compose Postgres use its own host port?",
+        "why": "make test and make check fail in db-up when another worktree holds port 5432, and all worktrees share the test_taiga database."
+      }
+    ],
+    "harness_used": [
+      "AGENTS.md/CLAUDE.md",
+      ".agents/skills/implement-change/SKILL.md",
+      "make check-fast, make db-up",
+      "docs/harness/log.md",
+      "Existing importer helpers and tests",
+      "attachments services.generate_refresh_fragment"
+    ],
+    "harness_gaps": [
+      {
+        "file": "Makefile",
+        "problem": "db-up fails when another worktree's Postgres holds port 5432, and the test database name is shared."
+      },
+      {
+        "file": "tests/config.py",
+        "problem": "Database name and port are hard-coded, with no environment override."
+      },
+      {
+        "file": "tests/factories.py",
+        "problem": "Nothing says that the status slug comes from the name, so passing slug= has no effect."
+      }
+    ]
+  }
+}

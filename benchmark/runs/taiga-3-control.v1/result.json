@@ -1,0 +1,67 @@
+{
+  "task": "taiga-3",
+  "arm": "control",
+  "start": "cf4ef73b81309835a9ac03587fe0b43c83a612c8",
+  "seconds": 2123,
+  "result": {
+    "status": "done",
+    "summary": "I added `GithubImporter._import_inline_images(markdown, obj, repository_full_name, created_date)` in `taiga/importers/github/importer.py`. For each distinct GitHub image URL it renders `![image](<url>)` with `render_markdown` and takes the `src` of the first `<img>` (the signed URL). It downloads the file with `download` and rejects it if the Content-Type is not `image/*`. The file name is the base name from Content-Disposition, or `github-attachment-<id><ext>` if there is none. It creates the `Attachment` as specified, saves the file with `attached_file.save`, and replaces the GitHub URL with `<file url>#<refresh fragment>`. If one image fails, it keeps the original link, calls `logger.warning` and goes on with the next image. The method is called when importing as user stories and as issues, after the object is created. The description is saved through the existing `.update()` only if it changed, and before `take_snapshot`, so the history also has the new description. I added 7 tests (11 cases). Full suite: 1702 passed, 51 failed. All 51 failures are in tests/integration/test_hooks_{bitbucket,github,gitlab,gogs}.py, and the same 51 fail on a clean checkout of HEAD, so this change did not cause them. Nothing was committed or pushed.",
+    "changes": [
+      {
+        "path": "taiga/importers/github/importer.py",
+        "summary": "Added module `logger`, imports of `Attachment` and `ContentType` and the attachments services, and helpers: first <img> src parser, header lookup that ignores case, safe base file name from Content-Disposition. Added `_import_inline_images` and `_import_inline_image`. Called them in `_import_user_stories_data` and `_import_issues_data` and save the description only if it changed."
+      },
+      {
+        "path": "tests/unit/test_importers_github.py",
+        "summary": "New tests: attachments created and URLs rewritten (each URL imported once, base name from Content-Disposition, fallback name with extension, refresh fragment, owner/project/created_date). Failed images keep their link and log a warning (download error, non-image type, missing type, no <img> in rendered HTML). End-to-end user story and issue import rewrites descriptions and keeps failed links."
+      }
+    ],
+    "acceptance": [
+      {
+        "criterion": "Imported user stories and issues point to local copies of their GitHub images, and a failed image keeps its link",
+        "met": true,
+        "evidence": "test_import_data_rewrites_inline_images_in_description[user_stories|issues] runs the real import loops: the description gets `<attachment url>#_taiga-refresh=<type>:<id>` and the failed image keeps its github.com URL. The failure paths and the logger.warning call are covered by test_import_inline_images_keeps_link_of_failed_image (3 cases) and test_import_inline_images_keeps_link_when_rendered_html_has_no_image."
+      },
+      {
+        "criterion": "The change is covered by tests",
+        "met": true,
+        "evidence": "7 new tests (11 cases with parametrization) in tests/unit/test_importers_github.py; the file passes with 18 tests."
+      },
+      {
+        "criterion": "The existing test suite still passes",
+        "met": true,
+        "evidence": "Full suite `pytest tests`: 1702 passed, 51 failed. All 51 failures are in tests/integration/test_hooks_{bitbucket,github,gitlab,gogs}.py (11/14/17/9). On a clean checkout of HEAD the same four files give the same result, 51 failed and 66 passed, so this change did not cause them. tests/unit: 240 passed. Importer integration tests: 80 passed."
+      }
+    ],
+    "human_needed": [
+      {
+        "question": "51 webhook tests (tests/integration/test_hooks_bitbucket/github/gitlab/gogs.py) already fail on HEAD without my change. Is this a known problem, and is it out of scope for this task?",
+        "why": "Because of these failures the suite cannot be fully green, and they have no link to the importer."
+      }
+    ],
+    "harness_used": [
+      "`.claude/skills/implement-change` skill (workflow, test locations, factories, pytest command with --reuse-db)",
+      "Existing `extract_github_inline_image_urls`, `GithubClient.render_markdown` and `GithubClient.download` with their tests",
+      "The Trello importer as a pattern for creating attachments; `attachments.services.generate_refresh_fragment` and `AttachmentSerializer.get_url` for the URL format",
+      "`tests/factories.py`"
+    ],
+    "harness_gaps": [
+      {
+        "file": "Makefile",
+        "problem": "The skill says to run `make setup`, `make check-fast` and `make check`, but this tree has no Makefile. I ran pytest directly."
+      },
+      {
+        "file": "docs/architecture.md, docs/local-dev.md, docs/product.md, docs/harness/log.md",
+        "problem": "The skill refers to these files, but they do not exist (docs/ only has update-dependencies.md)."
+      },
+      {
+        "file": "tests/integration/test_hooks_*.py",
+        "problem": "51 webhook tests already fail on a clean HEAD, so a green full suite cannot be the baseline."
+      },
+      {
+        "file": null,
+        "problem": "There is no fast gate: the full suite takes about 13.5 minutes without xdist, which is longer than one tool call can run."
+      }
+    ]
+  }
+}

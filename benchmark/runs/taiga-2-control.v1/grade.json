@@ -1,0 +1,35 @@
+{
+  "task": "taiga-2",
+  "arm": "control",
+  "applied": true,
+  "apply_error": "",
+  "hidden": {
+    "code": 0,
+    "tests": {
+      "ran": 84,
+      "skipped": 0,
+      "failed": 0
+    },
+    "seconds": 26,
+    "tail": ""
+  },
+  "full": {
+    "code": 0,
+    "tests": {
+      "ran": 1751,
+      "skipped": 0,
+      "failed": 0
+    },
+    "seconds": 922,
+    "tail": ""
+  },
+  "reference": {
+    "code": 0,
+    "tests": {
+      "ran": 1745,
+      "skipped": 0,
+      "failed": 0
+    }
+  },
+  "solved": true
+}

@@ -1,0 +1,63 @@
+{
+  "task": "taiga-3",
+  "arm": "control",
+  "start": "2719ff51e3437349541131bb67cd9af4b624bc79",
+  "seconds": 976,
+  "result": {
+    "status": "done",
+    "summary": "Done. When a GitHub project is imported as user stories or as issues, its inline images are now copied into Taiga as attachments of the imported item, and the description points to the local copies. I added `GithubImporter._import_inline_images(markdown, obj, repository_full_name, created_date)`. For each distinct GitHub image URL, it asks GitHub to render `![image](url)`, reads the signed `src` of the first `<img>` (HTML entities such as `&amp;` are decoded), and downloads the file. It rejects any file whose Content-Type is not `image/*`. The file name comes from Content-Disposition (base name only); if there is none, it is `github-attachment-<id><ext>`. The method then creates an `Attachment` and saves the file. The new URL is `<attached_file.url>#<generate_refresh_fragment(attachment)>`. If any step fails for one image, that image keeps its original link, `logger.warning` is called, and the next image is processed. The replacement does not touch a longer URL that starts with the same text. Both import paths call the method after the object is created and save the description only if it changed. The in-memory object is also updated, so the first history snapshot contains the new description. `Attachment`, `ContentType` and `logger` are names in the importer module. One choice to note: the attachment is not wrapped in its own database transaction. The import runs in autocommit, and a transaction would force a real database in mock-based tests. The full suite passes (1760 tests). To run it, I started a temporary Postgres in /tmp because none was running locally, and stopped and deleted it afterwards.",
+    "changes": [
+      {
+        "path": "taiga/importers/github/importer.py",
+        "summary": "Added logger, Attachment, ContentType and refresh-fragment imports. Added extract_first_image_src (HTMLParser-based) and _get_attachment_file_name (Content-Disposition parsing including RFC 2231, base name only, fallback github-attachment-<id><ext>). Added GithubImporter._import_inline_images and _import_inline_image. Both are called in _import_user_stories_data and _import_issues_data after creation, and the description is saved only if it changed."
+      },
+      {
+        "path": "tests/integration/test_importers_github_inline_images.py",
+        "summary": "New DB tests: attachments are created with the expected fields, each URL is imported once even if repeated, markdown and HTML <img> URLs are rewritten with the refresh fragment, failed images (download error, non-image content type, no <img> in the render) keep their link and log a warning, no images means no API calls, and the end-to-end user story and issue imports rewrite descriptions."
+      },
+      {
+        "path": "tests/unit/test_importers_github.py",
+        "summary": "Unit tests for extract_first_image_src (entity decoding, first image only, no image) and _get_attachment_file_name (quoted, path traversal, Windows path, RFC 2231, missing or invalid name)."
+      }
+    ],
+    "acceptance": [
+      {
+        "criterion": "Imported user stories and issues point to local copies of their GitHub images, and a failed image keeps its link",
+        "met": true,
+        "evidence": "test_import_user_stories_rewrites_inline_images and test_import_issues_rewrites_inline_images run the real import loops with a mocked client. They check that the attachment is linked to the user story or issue, that the description uses '<file url>#_taiga-refresh=<type>:<id>', and that a failing image URL stays unchanged. test_import_inline_images_keeps_link_of_failed_images covers a download exception and a non-image content type, with 2 logger.warning calls."
+      },
+      {
+        "criterion": "The change is covered by tests",
+        "met": true,
+        "evidence": "6 new integration tests and 9 new unit test cases, all passing."
+      },
+      {
+        "criterion": "The existing test suite still passes",
+        "met": true,
+        "evidence": "`.venv/bin/python -m pytest tests` gives 1760 passed in 784s. This was run against a temporary local Postgres on port 5432, user taiga."
+      }
+    ],
+    "human_needed": [],
+    "harness_used": [
+      "The project virtualenv at .venv/ with pytest and the tests/config.py settings",
+      "Existing helpers in the importer module: extract_github_inline_image_urls, GithubClient.render_markdown and GithubClient.download",
+      "The Trello, Jira and Pivotal importers as examples of creating Attachment objects",
+      "taiga.projects.attachments.services.generate_refresh_fragment",
+      "tests/factories.py"
+    ],
+    "harness_gaps": [
+      {
+        "file": null,
+        "problem": "The repository has no agent or contributor note (no CLAUDE.md or AGENTS.md) that explains how to run the tests. The integration tests need Postgres on localhost:5432 with user and password taiga, and nothing was running. I had to start a throwaway cluster with initdb myself."
+      },
+      {
+        "file": "requirements-tests.txt",
+        "problem": "pytest-xdist is not installed, so the full suite only runs serially (about 13 minutes)."
+      },
+      {
+        "file": "tests/factories.py",
+        "problem": "The status factories derive the slug from the name on save, so passing slug='open' does not work. This is not documented and caused one wrong first attempt in the new tests."
+      }
+    ]
+  }
+}

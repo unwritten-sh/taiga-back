@@ -1,0 +1,384 @@
+taiga/projects/services/members.py    |  4 +-
+ taiga/users/admin.py                  | 73 ++++++++++++++---------------------
+ tests/integration/test_memberships.py |  7 ++--
+ 3 files changed, 34 insertions(+), 50 deletions(-)
+
+diff --git a/taiga/projects/services/members.py b/taiga/projects/services/members.py
+index 8129a561..9646bb97 100644
+--- a/taiga/projects/services/members.py
++++ b/taiga/projects/services/members.py
+@@ -164,7 +164,7 @@ def check_if_new_member_can_be_created(new_membership):
+     if max_memberships is not None and total_memberships > max_memberships:
+         return False, error_members_exceeded, total_memberships
+ 
+-    if not new_membership.user_id and project.memberships.filter(user=None).count() + 1 > settings.MAX_PENDING_MEMBERSHIPS:
++    if pending_memberships > settings.MAX_PENDING_MEMBERSHIPS:
+         error_pending_memberships_exceeded = _("You have reached the current limit of pending memberships")
+         return False, error_pending_memberships_exceeded, pending_memberships
+ 
+@@ -211,7 +211,7 @@ def check_if_new_members_can_be_created(project, new_memberships):
+     if max_memberships is not None and total_memberships > max_memberships:
+         return False, error_members_exceeded, total_memberships
+ 
+-    if new_pending_memberships and project.memberships.filter(user=None).count() + len(new_pending_memberships) > settings.MAX_PENDING_MEMBERSHIPS:
++    if total_pending_memberships > settings.MAX_PENDING_MEMBERSHIPS:
+         error_pending_memberships_exceeded = _("You have reached the current limit of pending memberships")
+         return False, error_pending_memberships_exceeded, pending_memberships
+ 
+diff --git a/taiga/users/admin.py b/taiga/users/admin.py
+index a5da0796..fc4cf4e2 100644
+--- a/taiga/users/admin.py
++++ b/taiga/users/admin.py
+@@ -11,15 +11,12 @@ from django.contrib import admin
+ from django.contrib.auth.models import Group, Permission
+ from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
+ 
+-from django.utils.safestring import mark_safe
+ from django.utils.translation import gettext_lazy as _
+ 
+ from .models import Role, User
+ from .forms import UserChangeForm, UserCreationForm
+ 
+ 
+-SEPARATOR = "<strong>&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;</strong>"
+-
+ admin.site.unregister(Group)
+ 
+ 
+@@ -82,8 +79,8 @@ class OwnedProjectsInline(admin.TabularInline):
+     fk_name = "owner"
+     verbose_name = _("Project Ownership")
+     verbose_name_plural = _("Project Ownerships")
+-    fields = ("id", "name", "slug", "is_private", "total_memberships")
+-    readonly_fields = ("id", "name", "slug", "is_private", "total_memberships")
++    fields = ("id", "name", "slug", "is_private")
++    readonly_fields = ("id", "name", "slug", "is_private")
+     show_change_link = True
+     extra = 0
+ 
+@@ -93,16 +90,6 @@ class OwnedProjectsInline(admin.TabularInline):
+     def has_delete_permission(self, *args):
+         return False
+ 
+-    @admin.display(
+-        description=_("Memberships")
+-    )
+-    def total_memberships(self, obj):
+-        total = obj.memberships.all().count()
+-        pending = obj.memberships.filter(user=None).count()
+-        accepted = total - pending
+-        return mark_safe(f"{total}{SEPARATOR}<i>{accepted} accepted</i>{SEPARATOR}<i>{pending} pending</i>")
+-
+-
+ 
+ class RoleInline(admin.TabularInline):
+     model = Role
+@@ -133,22 +120,20 @@ class UserAdmin(DjangoUserAdmin):
+     ordering = ("username",)
+     readonly_fields = (
+         "total_private_projects", "total_memberships_private_projects",
+-        "total_public_projects", "total_memberships_public_projects",
++        "total_public_projects", "total_memberships_public_projects"
+     )
+     filter_horizontal = ()
+     fieldsets = (
+         (None, {"fields": ("username", "password")}),
+-        (_("PERSONAL INFO"), {"fields": ("full_name", "email", "bio", "photo")}),
+-        (_("EXTRA INFO"), {"fields": ("color", "lang", "timezone", "token", "colorize_tags",
++        (_("Personal info"), {"fields": ("full_name", "email", "bio", "photo")}),
++        (_("Extra info"), {"fields": ("color", "lang", "timezone", "token", "colorize_tags",
+                                       "email_token", "new_email", "verified_email", "accepted_terms", "read_new_terms")}),
+-        (_("PERMISSIONS"), {"fields": ("is_active", "is_superuser")}),
+-        (_("IMPORTANT DATES"), {"fields": (("last_login", "date_joined", "date_cancelled"),)}),
+-        (_("PROJECT OWNERSHIPS RESTRICTIONS"), {"fields": (("max_private_projects", "max_memberships_private_projects"),
++        (_("Permissions"), {"fields": ("is_active", "is_superuser")}),
++        (_("Restrictions"), {"fields": (("max_private_projects", "max_memberships_private_projects"),
+                                         ("max_public_projects", "max_memberships_public_projects"))}),
+-        (_("PROJECT OWNERSHIPS STATS"), {"fields": (("total_private_projects",
+-                                                     "total_memberships_private_projects"),
+-                                                    ("total_public_projects",
+-                                                     "total_memberships_public_projects"))}),
++        (_("Restrictions (Current Status)"), {"fields": (("total_private_projects", "total_memberships_private_projects"),
++                                                         ("total_public_projects", "total_memberships_public_projects"))}),
++        (_("Important dates"), {"fields": (("last_login", "date_joined", "date_cancelled"),)}),
+     )
+     # add_fieldsets is not a standard ModelAdmin attribute. UserAdmin
+     # overrides get_fieldsets to use this attribute when creating a user.
+@@ -166,51 +151,49 @@ class UserAdmin(DjangoUserAdmin):
+     add_form = UserCreationForm
+ 
+     @admin.display(
+-        description=_("Private projects owned")
++        description=_("Total private projects owned")
+     )
+     def total_private_projects(self, obj):
+         return obj.owned_projects.filter(is_private=True).count()
+ 
+     @admin.display(
+-        description=_("Private memberships owned")
++        description=_("Total private memberships owned")
+     )
+     def total_memberships_private_projects(self, obj):
+         Membership = apps.get_model("projects", "Membership")
+-        accepted = (Membership.objects.filter(project__is_private=True,
++        return (Membership.objects.filter(project__is_private=True,
+                                           project__owner_id=obj.id,
+                                           user_id__isnull=False)
+-                                  .values("user_id")
+-                                  .distinct().count())
+-        pending = (Membership.objects.filter(project__is_private=True,
++                                   .values("user_id")
++                                   .distinct().count()
++                +
++                Membership.objects.filter(project__is_private=True,
+                                           project__owner_id=obj.id,
+                                           user_id__isnull=True)
+-                                  .values("email")
+-                                  .distinct().count())
+-        total = pending + accepted
+-        return mark_safe(f"{total}{SEPARATOR}<i>{accepted} accepted</i>{SEPARATOR}<i>{pending} pending</i>")
++                                   .values("email")
++                                   .distinct().count())
+ 
+     @admin.display(
+-        description=_("Public projects owned")
++        description=_("Total public projects owned")
+     )
+     def total_public_projects(self, obj):
+         return obj.owned_projects.filter(is_private=False).count()
+ 
+     @admin.display(
+-        description=_("Public memberships owned")
++        description=_("Total public memberships owned")
+     )
+     def total_memberships_public_projects(self, obj):
+         Membership = apps.get_model("projects", "Membership")
+-        accepted =  (Membership.objects.filter(project__is_private=False,
++        return (Membership.objects.filter(project__is_private=False,
+                                           project__owner_id=obj.id,
+                                           user_id__isnull=False)
+-                                  .values("user_id")
+-                                  .distinct().count())
+-        pending = (Membership.objects.filter(project__is_private=False,
++                                   .values("user_id")
++                                   .distinct().count()
++                +
++                Membership.objects.filter(project__is_private=False,
+                                           project__owner_id=obj.id,
+                                           user_id__isnull=True)
+-                                  .values("email")
+-                                  .distinct().count())
+-        total = pending + accepted
+-        return mark_safe(f"{total}{SEPARATOR}<i>{accepted} accepted</i>{SEPARATOR}<i>{pending} pending</i>")
++                                   .values("email")
++                                   .distinct().count())
+ 
+ 
+diff --git a/tests/integration/test_memberships.py b/tests/integration/test_memberships.py
+index 5a0afded..176b074b 100644
+--- a/tests/integration/test_memberships.py
++++ b/tests/integration/test_memberships.py
+@@ -879,9 +879,10 @@ def test_api_delete_membership_without_user(client):
+ 
+ 
+ def test_api_create_member_max_pending_memberships(client, settings):
+-    settings.MAX_PENDING_MEMBERSHIPS = 3
++    settings.MAX_PENDING_MEMBERSHIPS = 2
+     project = f.ProjectFactory()
+     john = f.UserFactory.create()
++    joseph = f.UserFactory.create(email="joseph@email.com")
+     tester = f.RoleFactory(project=project, name="Tester")
+     f.MembershipFactory(project=project, user=john, is_admin=True)
+     f.MembershipFactory(project=project, user=None, email="test1@mail.com")
+@@ -889,7 +890,7 @@ def test_api_create_member_max_pending_memberships(client, settings):
+     f.MembershipFactory(project=project, user=None, email="test3@mail.com")
+ 
+     url = reverse("memberships-list")
+-    data = {"project": project.id, "role": tester.id, "username": "joseph@email.com"}
++    data = {"project": project.id, "role": tester.id, "username": joseph.email}
+     client.login(john)
+     response = client.json.post(url, json.dumps(data))
+     assert response.status_code == 400
+@@ -910,7 +911,7 @@ def test_api_create_bulk_members_max_pending_memberships(client, settings):
+     data = {
+         "project_id": project.id,
+         "bulk_memberships": [
+-            {"role_id": tester.id, "username": "joseph@email.com"},
++            {"role_id": tester.id, "username": "testing@taiga.io"},
+         ]
+     }
+     client.login(john)
+
+--- Changes ---
+
+taiga/projects/services/members.py
+  @@ -164,7 +164,7 @@ def check_if_new_member_can_be_created(new_membership):
+  -    if not new_membership.user_id and project.memberships.filter(user=None).count() + 1 > settings.MAX_PENDING_MEMBERSHIPS:
+  +    if pending_memberships > settings.MAX_PENDING_MEMBERSHIPS:
+           error_pending_memberships_exceeded = _("You have reached the current limit of pending memberships")
+           return False, error_pending_memberships_exceeded, pending_memberships
+   
+  @@ -211,7 +211,7 @@ def check_if_new_members_can_be_created(project, new_memberships):
+  -    if new_pending_memberships and project.memberships.filter(user=None).count() + len(new_pending_memberships) > settings.MAX_PENDING_MEMBERSHIPS:
+  +    if total_pending_memberships > settings.MAX_PENDING_MEMBERSHIPS:
+           error_pending_memberships_exceeded = _("You have reached the current limit of pending memberships")
+           return False, error_pending_memberships_exceeded, pending_memberships
+   
+  +2 -2
+
+taiga/users/admin.py
+  @@ -11,15 +11,12 @@ from django.contrib import admin
+  -from django.utils.safestring import mark_safe
+   from django.utils.translation import gettext_lazy as _
+   
+   from .models import Role, User
+   from .forms import UserChangeForm, UserCreationForm
+   
+   
+  -SEPARATOR = "<strong>&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;</strong>"
+  -
+   admin.site.unregister(Group)
+   
+   
+  @@ -82,8 +79,8 @@ class OwnedProjectsInline(admin.TabularInline):
+  -    fields = ("id", "name", "slug", "is_private", "total_memberships")
+  -    readonly_fields = ("id", "name", "slug", "is_private", "total_memberships")
+  +    fields = ("id", "name", "slug", "is_private")
+  +    readonly_fields = ("id", "name", "slug", "is_private")
+       show_change_link = True
+       extra = 0
+   
+  @@ -93,16 +90,6 @@ class OwnedProjectsInline(admin.TabularInline):
+  -    @admin.display(
+  -        description=_("Memberships")
+  -    )
+  -    def total_memberships(self, obj):
+  -        total = obj.memberships.all().count()
+  -        pending = obj.memberships.filter(user=None).count()
+  -        accepted = total - pending
+  -        return mark_safe(f"{total}{SEPARATOR}<i>{accepted} accepted</i>{SEPARATOR}<i>{pending} pending</i>")
+  -
+  -
+   
+   class RoleInline(admin.TabularInline):
+       model = Role
+  @@ -133,22 +120,20 @@ class UserAdmin(DjangoUserAdmin):
+  -        "total_public_projects", "total_memberships_public_projects",
+  +        "total_public_projects", "total_memberships_public_projects"
+       )
+       filter_horizontal = ()
+       fieldsets = (
+           (None, {"fields": ("username", "password")}),
+  -        (_("PERSONAL INFO"), {"fields": ("full_name", "email", "bio", "photo")}),
+  -        (_("EXTRA INFO"), {"fields": ("color", "lang", "timezone", "token", "colorize_tags",
+  +        (_("Personal info"), {"fields": ("full_name", "email", "bio", "photo")}),
+  +        (_("Extra info"), {"fields": ("color", "lang", "timezone", "token", "colorize_tags",
+                                         "email_token", "new_email", "verified_email", "accepted_terms", "read_new_terms")}),
+  -        (_("PERMISSIONS"), {"fields": ("is_active", "is_superuser")}),
+  -        (_("IMPORTANT DATES"), {"fields": (("last_login", "date_joined", "date_cancelled"),)}),
+  -        (_("PROJECT OWNERSHIPS RESTRICTIONS"), {"fields": (("max_private_projects", "max_memberships_private_projects"),
+  +        (_("Permissions"), {"fields": ("is_active", "is_superuser")}),
+  +        (_("Restrictions"), {"fields": (("max_private_projects", "max_memberships_private_projects"),
+                                           ("max_public_projects", "max_memberships_public_projects"))}),
+  -        (_("PROJECT OWNERSHIPS STATS"), {"fields": (("total_private_projects",
+  -                                                     "total_memberships_private_projects"),
+  -                                                    ("total_public_projects",
+  -                                                     "total_memberships_public_projects"))}),
+  +        (_("Restrictions (Current Status)"), {"fields": (("total_private_projects", "total_memberships_private_projects"),
+  +                                                         ("total_public_projects", "total_memberships_public_projects"))}),
+  +        (_("Important dates"), {"fields": (("last_login", "date_joined", "date_cancelled"),)}),
+       )
+       # add_fieldsets is not a standard ModelAdmin attribute. UserAdmin
+       # overrides get_fieldsets to use this attribute when creating a user.
+  @@ -166,51 +151,49 @@ class UserAdmin(DjangoUserAdmin):
+  -        description=_("Private projects owned")
+  +        description=_("Total private projects owned")
+       )
+       def total_private_projects(self, obj):
+           return obj.owned_projects.filter(is_private=True).count()
+   
+       @admin.display(
+  -        description=_("Private memberships owned")
+  +        description=_("Total private memberships owned")
+       )
+       def total_memberships_private_projects(self, obj):
+           Membership = apps.get_model("projects", "Membership")
+  -        accepted = (Membership.objects.filter(project__is_private=True,
+  +        return (Membership.objects.filter(project__is_private=True,
+                                             project__owner_id=obj.id,
+                                             user_id__isnull=False)
+  -                                  .values("user_id")
+  -                                  .distinct().count())
+  -        pending = (Membership.objects.filter(project__is_private=True,
+  +                                   .values("user_id")
+  +                                   .distinct().count()
+  +                +
+  +                Membership.objects.filter(project__is_private=True,
+                                             project__owner_id=obj.id,
+                                             user_id__isnull=True)
+  -                                  .values("email")
+  -                                  .distinct().count())
+  -        total = pending + accepted
+  -        return mark_safe(f"{total}{SEPARATOR}<i>{accepted} accepted</i>{SEPARATOR}<i>{pending} pending</i>")
+  +                                   .values("email")
+  +                                   .distinct().count())
+   
+       @admin.display(
+  -        description=_("Public projects owned")
+  +        description=_("Total public projects owned")
+       )
+       def total_public_projects(self, obj):
+           return obj.owned_projects.filter(is_private=False).count()
+   
+       @admin.display(
+  -        description=_("Public memberships owned")
+  +        description=_("Total public memberships owned")
+       )
+       def total_memberships_public_projects(self, obj):
+           Membership = apps.get_model("projects", "Membership")
+  -        accepted =  (Membership.objects.filter(project__is_private=False,
+  +        return (Membership.objects.filter(project__is_private=False,
+                                             project__owner_id=obj.id,
+                                             user_id__isnull=False)
+  -                                  .values("user_id")
+  -                                  .distinct().count())
+  -        pending = (Membership.objects.filter(project__is_private=False,
+  +                                   .values("user_id")
+  +                                   .distinct().count()
+  +                +
+  +                Membership.objects.filter(project__is_private=False,
+                                             project__owner_id=obj.id,
+                                             user_id__isnull=True)
+  -                                  .values("email")
+  -                                  .distinct().count())
+  -        total = pending + accepted
+  -        return mark_safe(f"{total}{SEPARATOR}<i>{accepted} accepted</i>{SEPARATOR}<i>{pending} pending</i>")
+  +                                   .values("email")
+  +                                   .distinct().count())
+   
+   
+  +28 -45
+
+tests/integration/test_memberships.py
+  @@ -879,9 +879,10 @@ def test_api_delete_membership_without_user(client):
+  -    settings.MAX_PENDING_MEMBERSHIPS = 3
+  +    settings.MAX_PENDING_MEMBERSHIPS = 2
+       project = f.ProjectFactory()
+       john = f.UserFactory.create()
+  +    joseph = f.UserFactory.create(email="joseph@email.com")
+       tester = f.RoleFactory(project=project, name="Tester")
+       f.MembershipFactory(project=project, user=john, is_admin=True)
+       f.MembershipFactory(project=project, user=None, email="test1@mail.com")
+  @@ -889,7 +890,7 @@ def test_api_create_member_max_pending_memberships(client, settings):
+  -    data = {"project": project.id, "role": tester.id, "username": "joseph@email.com"}
+  +    data = {"project": project.id, "role": tester.id, "username": joseph.email}
+       client.login(john)
+       response = client.json.post(url, json.dumps(data))
+       assert response.status_code == 400
+  @@ -910,7 +911,7 @@ def test_api_create_bulk_members_max_pending_memberships(client, settings):
+  -            {"role_id": tester.id, "username": "joseph@email.com"},
+  +            {"role_id": tester.id, "username": "testing@taiga.io"},
+           ]
+       }
+       client.login(john)
+  +4 -3

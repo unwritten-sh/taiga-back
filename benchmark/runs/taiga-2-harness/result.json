@@ -1,0 +1,87 @@
+{
+  "task": "taiga-2",
+  "arm": "harness",
+  "start": "3cad693c0f5b4fd50750dcc9c162e7263bbe2c28",
+  "seconds": 1610,
+  "result": {
+    "status": "done",
+    "summary": "Password recovery tokens now expire. There is a new setting, PASSWORD_RECOVERY_TOKEN_LIFETIME, with a default of timedelta(hours=1), and a new nullable field User.token_expires_at with migration 0034. password_recovery sets a new token and token_expires_at = timezone.now() + lifetime, so asking again replaces both. change_password_from_recovery only accepts a token whose expiration is in the future. An expired token, or a legacy token without an expiration date, gets the same 400 'Token is invalid' as an unknown token, and nothing on the user changes. On success the token and its expiration date are cleared. change_password, change_email and User.cancel() also clear token_expires_at. The new tests fail on the old code and pass on the new code. The whole suite passes: 1751 passed in 13 min 48 s. `make test` itself could not start the database: its db-up step failed because port 5432 is held by another worktree's PostgreSQL container. So I ran pytest directly against that container, with a separately named test database.",
+    "changes": [
+      {
+        "path": "settings/common.py",
+        "summary": "Added PASSWORD_RECOVERY_TOKEN_LIFETIME = timedelta(hours=1)."
+      },
+      {
+        "path": "taiga/users/models.py",
+        "summary": "Added nullable DateTimeField token_expires_at; cancel() clears it."
+      },
+      {
+        "path": "taiga/users/migrations/0034_user_token_expires_at.py",
+        "summary": "New migration adding User.token_expires_at."
+      },
+      {
+        "path": "taiga/users/api.py",
+        "summary": "password_recovery sets token_expires_at. change_password_from_recovery requires token_expires_at__gt=now() (same 400 error as an unknown token) and clears both fields on success. change_password and change_email also clear token_expires_at."
+      },
+      {
+        "path": "tests/integration/test_users.py",
+        "summary": "New tests for: expiration set from the setting, asking again replaces token and expiration, success clears both fields, rejection after the lifetime (mocked now), and expired or legacy tokens rejected like unknown ones with the user unchanged. The max-length test now sets a future expiration."
+      },
+      {
+        "path": "tests/integration/resources_permissions/test_users_resources.py",
+        "summary": "The recovery permission test now sets a future token_expires_at."
+      },
+      {
+        "path": "docs/harness/log.md",
+        "summary": "Added a 2026-11-02 entry for this change, what was learned, and what is left."
+      }
+    ],
+    "acceptance": [
+      {
+        "criterion": "Recovery tokens expire after the configured time and legacy tokens are rejected like unknown ones",
+        "met": true,
+        "evidence": "These new tests pass: test_password_recovery_sets_token_with_expiration, test_change_password_from_recovery_full_flow_and_expiration and test_change_password_from_recovery_rejects_expired_or_legacy_token[expired|legacy-without-expiration]. The last one checks that the status and body are the same as for an unknown token and that the password, token and expiration do not change."
+      },
+      {
+        "criterion": "The change is covered by tests",
+        "met": true,
+        "evidence": "6 new or changed recovery tests fail against HEAD's api.py (checked by putting the old file back for one run) and pass with the change."
+      },
+      {
+        "criterion": "The existing test suite still passes",
+        "met": true,
+        "evidence": "Full pytest run with --create-db on a separate test database: '1751 passed, 15572 warnings in 827.69s'. Also: make check-fast passes (238 passed), and make migrations-check reports 'No changes detected'."
+      }
+    ],
+    "human_needed": [
+      {
+        "question": "Is it acceptable that all recovery tokens issued before the deploy stop working, so that users must ask for a new recovery email?",
+        "why": "The task asks to reject legacy tokens. This affects users who have a recovery email pending at deploy time."
+      },
+      {
+        "question": "Should PASSWORD_RECOVERY_TOKEN_LIFETIME be configurable through an environment variable in docker/config.py?",
+        "why": "AGENTS.md says docker/config.py variable names need care, so I did not add one. Today Docker installations can only use the default of one hour."
+      }
+    ],
+    "harness_used": [
+      "AGENTS.md/CLAUDE.md: commands table (make check-fast, migrations-check, test), the conventions on migrations and gettext, and the rule to add a harness log entry",
+      "The --create-db versus --reuse-db note in AGENTS.md",
+      "docs/harness/log.md format",
+      "make db-up / make migrations-check targets"
+    ],
+    "harness_gaps": [
+      {
+        "file": "Makefile",
+        "problem": "`make test` and `make check` always call `make db-up`, which fails when another worktree's compose PostgreSQL already uses port 5432. There is no option for another port or test database name."
+      },
+      {
+        "file": "tests/config.py",
+        "problem": "The test database name is fixed, and no environment variable can change it, so parallel worktrees can overwrite each other's test_taiga database. I had to write a settings module outside the repo to isolate the full run."
+      },
+      {
+        "file": "AGENTS.md",
+        "problem": "Nothing says how to run the whole suite with parallel worktrees. The suite takes about 14 minutes without coverage, which is longer than an agent's default 10-minute background limit, and nothing warns about this."
+      }
+    ]
+  }
+}

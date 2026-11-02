@@ -1,0 +1,20 @@
+{
+  "arm": "harness",
+  "seconds": 1022,
+  "result": {
+    "status": "done",
+    "test_command": "make test",
+    "setup_steps": [
+      "Read AGENTS.md/CLAUDE.md, Makefile, compose.yaml, pytest.ini and docs/local-dev.md",
+      "Checked prerequisites: uv, Docker (running), pg_config, Homebrew libpq/libmagic/cairo/gettext already installed; port 5432 free",
+      "Ran `make setup`: uv created .venv with Python 3.10.18, installed requirements.txt and requirements-devel.txt, set git config core.hooksPath=.githooks (local git config only, no history change), started the compose PostgreSQL 13 container (onboard-harness-postgres-1) on localhost:5432 with user/password/db taiga, applied migrations",
+      "Ran `make test` (= `docker compose up -d --wait postgres` then `.venv/bin/pytest --create-db`): 1751 passed, 0 failed, 0 skipped, in 15 min 40 s",
+      "Left the PostgreSQL container running for the next run"
+    ],
+    "summary": "I set up the environment with the repository's own Makefile and ran the whole suite with `make test`: 1751 passed, 0 failed, 0 skipped, in about 15.7 minutes. Setup used Python 3.10.18 in .venv (made by uv) and PostgreSQL 13 from compose.yaml, which I left running on localhost:5432. `make test` starts PostgreSQL if it is down, then runs `.venv/bin/pytest --create-db`, which builds a fresh test database each time. I did not change any product code, tests or git history, and the working tree is clean. The only side effect is local git config: `make setup` sets core.hooksPath to .githooks, so a pre-push hook now runs. There were about 15.5k warnings, mostly deprecation warnings from factory-boy and Django, and none of them failed a test. The last commit adds flake8 to requirements-devel.in. Its message says this change needs review.",
+    "human_needed": [
+      "The HEAD commit adds `flake8` to requirements-devel.in, and its message says it needs review. Is this change accepted, and was requirements-devel.txt recompiled with pip-tools to match?",
+      "settings/common.py:249 has a hard-coded SECRET_KEY. Does any real installation use it, and should it come from an environment variable (with rotation)? This question is already flagged in AGENTS.md."
+    ]
+  }
+}

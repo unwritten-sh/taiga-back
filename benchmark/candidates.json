@@ -1,0 +1,58 @@
+[
+  {
+    "sha": "94a0c077bdb852077910d815b7b1962e1c8ffb90",
+    "date": "2026-10-29",
+    "subject": "fix: expire invitation tokens after one week",
+    "product": [
+      "taiga/export_import/services/store.py",
+      "taiga/projects/api.py",
+      "taiga/projects/services/invitations.py",
+      "taiga/projects/services/members.py"
+    ],
+    "tests": [
+      "tests/factories.py"
+    ],
+    "changed": 50
+  },
+  {
+    "sha": "51832d2d0cf285eb6497452bbc4800241f89df29",
+    "date": "2026-09-28",
+    "subject": "feat: expire password recovery tokens",
+    "product": [
+      "settings/common.py",
+      "taiga/users/api.py",
+      "taiga/users/migrations/0034_user_token_expires_at.py",
+      "taiga/users/models.py"
+    ],
+    "tests": [
+      "tests/integration/resources_permissions/test_users_resources.py",
+      "tests/integration/test_users.py"
+    ],
+    "changed": 31
+  },
+  {
+    "sha": "74f28077f7b23617a3287d45029d56a22c6da781",
+    "date": "2026-09-07",
+    "subject": "persist imported GitHub images and rewrite descriptions",
+    "product": [
+      "taiga/importers/github/importer.py"
+    ],
+    "tests": [
+      "tests/unit/test_importers_github.py"
+    ],
+    "changed": 115
+  },
+  {
+    "sha": "c6fc37970106e540d84a56a71de74f23eb52ef8d",
+    "date": "2022-01-26",
+    "subject": "fix: max pending membershipw per project again (#76)",
+    "product": [
+      "taiga/projects/services/members.py",
+      "taiga/users/admin.py"
+    ],
+    "tests": [
+      "tests/integration/test_memberships.py"
+    ],
+    "changed": 75
+  }
+]

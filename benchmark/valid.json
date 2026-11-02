@@ -1,0 +1,98 @@
+[
+  {
+    "sha": "c6fc37970106e540d84a56a71de74f23eb52ef8d",
+    "subject": "fix: max pending membershipw per project again (#76)",
+    "valid": false,
+    "error": "error: could not revert c6fc3797... fix: max pending membershipw per project again (#76)\nhint: after resolving the conflicts, mark the corrected paths\nhint: with 'git add <paths>' or 'git rm <paths>'\nhint: Disable this message with \"git config set advice.mergeConflict false\"\n"
+  },
+  {
+    "sha": "94a0c077bdb852077910d815b7b1962e1c8ffb90",
+    "subject": "fix: expire invitation tokens after one week",
+    "without": {
+      "code": 1,
+      "tests": {
+        "ran": 77,
+        "skipped": 0,
+        "failed": 3
+      }
+    },
+    "with": {
+      "code": 0,
+      "tests": {
+        "ran": 77,
+        "skipped": 0,
+        "failed": 0
+      },
+      "tail": ""
+    },
+    "valid": true,
+    "reference": {
+      "code": 0,
+      "tests": {
+        "ran": 1748,
+        "skipped": 0,
+        "failed": 0
+      }
+    }
+  },
+  {
+    "sha": "51832d2d0cf285eb6497452bbc4800241f89df29",
+    "subject": "feat: expire password recovery tokens",
+    "without": {
+      "code": 1,
+      "tests": {
+        "ran": 84,
+        "skipped": 0,
+        "failed": 7
+      }
+    },
+    "with": {
+      "code": 0,
+      "tests": {
+        "ran": 84,
+        "skipped": 0,
+        "failed": 0
+      },
+      "tail": ""
+    },
+    "valid": true,
+    "reference": {
+      "code": 0,
+      "tests": {
+        "ran": 1745,
+        "skipped": 0,
+        "failed": 0
+      }
+    }
+  },
+  {
+    "sha": "74f28077f7b23617a3287d45029d56a22c6da781",
+    "subject": "persist imported GitHub images and rewrite descriptions",
+    "without": {
+      "code": 1,
+      "tests": {
+        "ran": 16,
+        "skipped": 0,
+        "failed": 5
+      }
+    },
+    "with": {
+      "code": 0,
+      "tests": {
+        "ran": 16,
+        "skipped": 0,
+        "failed": 0
+      },
+      "tail": ""
+    },
+    "valid": true,
+    "reference": {
+      "code": 0,
+      "tests": {
+        "ran": 1746,
+        "skipped": 0,
+        "failed": 0
+      }
+    }
+  }
+]

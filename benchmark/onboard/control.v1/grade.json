@@ -1,0 +1,14 @@
+{
+  "arm": "control",
+  "seconds": 1179,
+  "command": ".venv/bin/python -m pytest",
+  "code": 0,
+  "tests": {
+    "ran": 1751,
+    "skipped": 0,
+    "failed": 0
+  },
+  "tail": "",
+  "reports": 0,
+  "ready": true
+}

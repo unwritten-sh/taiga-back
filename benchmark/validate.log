@@ -1,0 +1,8 @@
+[21:06:56] validate 94a0c077bd fix: expire invitation tokens after one week
+[21:06:57]   valid=false error=error: could not revert 94a0c077... fix: expire invitation tokens after one week
+[21:06:57] validate 51832d2d0c feat: expire password recovery tokens
+[21:06:58]   valid=false error=error: could not revert 51832d2d... feat: expire password recovery tokens
+[21:06:58] validate 74f28077f7 persist imported GitHub images and rewrite descriptions
+[21:06:58]   valid=false error=error: could not revert 74f28077... persist imported GitHub images and rewrite descriptions
+[21:06:58] validate c6fc379701 fix: max pending membershipw per project again (#76)
+[21:06:59]   valid=false error=error: could not revert c6fc3797... fix: max pending membershipw per project again (#76)

@@ -1,0 +1,14 @@
+{
+  "arm": "harness",
+  "seconds": 1022,
+  "command": "make test",
+  "code": 0,
+  "tests": {
+    "ran": 1751,
+    "skipped": 0,
+    "failed": 0
+  },
+  "tail": "",
+  "reports": 0,
+  "ready": true
+}

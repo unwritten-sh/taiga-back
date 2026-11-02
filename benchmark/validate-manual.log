@@ -1,0 +1,6 @@
+[21:33:02] validate 94a0c077bd fix: expire invitation tokens after one week
+[21:55:18]   valid=true
+[21:55:18] validate 51832d2d0c feat: expire password recovery tokens
+[22:14:29]   valid=true
+[22:14:29] validate 74f28077f7 persist imported GitHub images and rewrite descriptions
+[22:31:11]   valid=true

@@ -1,0 +1,23 @@
+{
+  "task": "taiga-1",
+  "A": "harness",
+  "B": "control",
+  "answer": {
+    "A": {
+      "scope": 4,
+      "conventions": 4,
+      "tests": 4,
+      "readability": 4,
+      "notes": "Covers every issuer: API create, bulk, import and sample_data. All of them go through generate_invitation_token/set_invitation_token. The lifetime sits in settings next to PASSWORD_RECOVERY_TOKEN_LIFETIME, which fits the existing pattern. The pre_save condition `not obj.user and (not obj.id or not obj.token)` quietly overrides any token the client sends on create, but the reason isn't obvious and there's no comment. The save during resend is done inline in the view. Bulk now always overwrites the token. The tests are thorough (expired and legacy cases, login, register, get-by-token, resend for valid/expired/legacy, import, bulk, factories), but they all sit in one new file instead of next to the related existing tests."
+    },
+    "B": {
+      "scope": 4,
+      "conventions": 4,
+      "tests": 5,
+      "readability": 5,
+      "notes": "Uses the same shared helper and covers the same issuers. It adds rotate_invitation_token and get_valid_invitations, so InvitationViewSet and get_membership_by_token share one queryset and the view logic stays small. It makes token and token_expires_at read-only in MembershipValidator. That goes slightly beyond the task, but it's a reasonable hardening and a test covers it. The lifetime constant lives in the services module, not in settings. The tests go into the existing test_auth, test_importer_api and test_memberships files. They cover expired and legacy tokens on login, register and get, resend rotation (old link gives 404, new one works), resending expired or legacy invitations, bulk, the get_members_from_bulk unit, and ignoring a client-supplied token. The parametrize values call timezone.now() at import time, which is harmless here."
+    },
+    "merge_first": "B",
+    "why": "Both changes are correct and complete. B is a little cleaner: one get_valid_invitations queryset is reused for both lookups, rotation is a named service function instead of inline view code, and blocking client-supplied tokens is explicit and tested rather than hidden in a pre_save condition. B's tests also sit in the existing test files and cover a bit more."
+  }
+}

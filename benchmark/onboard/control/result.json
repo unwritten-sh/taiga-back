@@ -1,0 +1,17 @@
+{
+  "arm": "control",
+  "seconds": 1393,
+  "result": {
+    "status": "done",
+    "test_command": ".venv/bin/python -m pytest",
+    "setup_steps": [
+      "Read README, CI workflow (.github/workflows/tests-and-coverall.yml), tox.ini, pytest.ini, .python-version (3.10) and tests/config.py (expects Postgres at localhost:5432, db/user/password taiga/taiga; DJANGO_SETTINGS_MODULE=tests.config set in pytest.ini).",
+      "Started Postgres 13 (same major version as CI) in Docker: docker run -d --name taiga-test-postgres -e POSTGRES_USER=taiga -e POSTGRES_PASSWORD=taiga -e POSTGRES_DB=taiga -p 5432:5432 --restart unless-stopped postgres:13",
+      "Created a Python 3.10 virtualenv: uv venv --python 3.10 .venv",
+      "Installed dependencies like CI does: uv pip install --python .venv/bin/python -r requirements.txt -r requirements-devel.txt",
+      "Ran unit tests as a smoke check (238 passed), then the full suite: .venv/bin/python -m pytest (1751 passed in about 21 minutes)."
+    ],
+    "summary": "The full test suite passes: 1751 passed, 0 failed, in about 21 minutes. The environment is a Python 3.10 virtualenv in .venv (ignored by git) and a Postgres 13 Docker container named taiga-test-postgres on port 5432 with user, password and database all set to taiga. I left the container running. CI also starts RabbitMQ, but I did not start it: the tests turn Celery off, use the Postgres events backend, and never reference RabbitMQ, and the suite passed without it. I changed no code, tests or git history.",
+    "human_needed": []
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "task": "taiga-2",
+  "arm": "control",
+  "start": "30d1c8163cf575dedbe072656b0f3779bfe74486",
+  "seconds": 1609,
+  "result": {
+    "status": "done",
+    "summary": "Password recovery tokens now expire. A new setting PASSWORD_RECOVERY_TOKEN_LIFETIME (default timedelta(hours=1)) and a nullable User.token_expires_at field (migration 0034) were added. password_recovery sets a new uuid4 token and token_expires_at = timezone.now() + lifetime; asking again replaces both. change_password_from_recovery only matches a user whose token_expires_at is in the future. Expired tokens and legacy tokens with no expiration date get the same 400 'Token is invalid' as an unknown token, and the user is not changed. On success, both token and token_expires_at are cleared. For consistency, token_expires_at is also cleared in the other places that already cleared the recovery token (change_password, change_email, User.cancel), and the field was added to the admin. Tests: 9 new tests were added, and 2 existing tests that created tokens without an expiration date were updated. When I removed the expiry check, 3 of the new tests failed, so they do catch the bug. The full suite passes: 1753 tests in 13 min 39 s. To run the tests, I started a temporary Postgres cluster in /tmp/taigapg.Iko3 and stopped it afterwards. The user's Homebrew Postgres data was not touched. No commits were made.",
+    "changes": [
+      {
+        "path": "settings/common.py",
+        "summary": "Add PASSWORD_RECOVERY_TOKEN_LIFETIME = timedelta(hours=1)."
+      },
+      {
+        "path": "taiga/users/models.py",
+        "summary": "Add nullable token_expires_at DateTimeField; clear it in User.cancel()."
+      },
+      {
+        "path": "taiga/users/migrations/0034_user_token_expires_at.py",
+        "summary": "New migration adding User.token_expires_at (makemigrations --check reports no changes)."
+      },
+      {
+        "path": "taiga/users/api.py",
+        "summary": "password_recovery sets token + expiration; change_password_from_recovery requires token_expires_at > now and clears both on success; change_password and change_email also clear token_expires_at."
+      },
+      {
+        "path": "taiga/users/admin.py",
+        "summary": "Show token_expires_at next to token in the user admin."
+      },
+      {
+        "path": "tests/integration/test_users.py",
+        "summary": "Add tests: expiration set from the setting, default of one hour, re-request replaces token and date, valid token succeeds and clears both, full flow, expired token rejected, legacy null token rejected with the same error as an unknown token and user unchanged, token rejected after the lifetime (mocked clock). Update max-length test to use a token that has not expired."
+      },
+      {
+        "path": "tests/integration/resources_permissions/test_users_resources.py",
+        "summary": "Give the recovery token a future expiration date in the permissions test."
+      }
+    ],
+    "acceptance": [
+      {
+        "criterion": "Recovery tokens expire after the configured time and legacy tokens are rejected like unknown ones",
+        "met": true,
+        "evidence": "The query filters on token_expires_at__gt=timezone.now(). These tests pass: test_password_recovery_token_expires_after_configured_lifetime, test_change_password_from_recovery_with_expired_token, and test_change_password_from_recovery_with_legacy_token_without_expiration_date (same response data as an unknown token; password, token and expiration date unchanged)."
+      },
+      {
+        "criterion": "The change is covered by tests",
+        "met": true,
+        "evidence": "9 new tests in tests/integration/test_users.py. With the expiry check removed, 3 of the new tests fail."
+      },
+      {
+        "criterion": "The existing test suite still passes",
+        "met": true,
+        "evidence": "Full run of python -m pytest tests: 1753 passed in 819.56s, exit code 0."
+      }
+    ],
+    "human_needed": [],
+    "harness_used": [
+      "Git history of the invitation token expiration change (commits 50f68b7d, 94a0c077): a pattern to follow for the token_expires_at field, migration style, null-means-expired rule and the factory/test approach",
+      "pytest.ini with tests.config settings",
+      "Project .venv with the test dependencies",
+      "settings/common.py, which already has timedelta-based token lifetimes"
+    ],
+    "harness_gaps": [
+      {
+        "file": null,
+        "problem": "No agent or contributor docs (CLAUDE.md/AGENTS.md, or test instructions in CONTRIBUTING.md) explain how to run the tests. The suite needs a running Postgres (taiga/taiga on 127.0.0.1:5432), which was not running, so I had to create a temporary cluster."
+      },
+      {
+        "file": "requirements-devel.txt",
+        "problem": "pytest-xdist is not installed, so the full suite runs serially and takes about 14 minutes, longer than the 10-minute background limit. I found no documented faster subset to run."
+      },
+      {
+        "file": "tests/factories.py",
+        "problem": "There is no time-freezing helper (such as freezegun) for expiration tests. I used unittest.mock to patch taiga.users.api.timezone.now."
+      }
+    ]
+  }
+}
